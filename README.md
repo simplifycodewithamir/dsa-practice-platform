@@ -8,7 +8,7 @@ source-code/
 ├── CLAUDE.md                             # always-on project context
 ├── .claude/skills/dsa-practice-platform/SKILL.md   # Judge/sandbox architecture, loads on-demand
 ├── DsaPractice.sln
-├── src/
+├── source/
 │   ├── DsaPractice.Api/                  # Minimal API — Questions, Submissions (metadata only)
 │   ├── DsaPractice.Api.DataAccess/       # EF Core, Postgres
 │   ├── DsaPractice.Api.DataMigrations/   # migrations, split per convention
@@ -44,8 +44,8 @@ source-code/
 ## Local dev
 ```bash
 docker compose up postgres rabbitmq -d
-dotnet run --project src/DsaPractice.Api
-dotnet run --project src/DsaPractice.Judge
+dotnet run --project source/DsaPractice.Api
+dotnet run --project source/DsaPractice.Judge
 ```
 
 ## Conventions

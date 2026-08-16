@@ -1,8 +1,8 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-WORKDIR /src
+WORKDIR /source
 COPY . .
-RUN dotnet restore "src/DsaPractice.Api/DsaPractice.Api.csproj"
-RUN dotnet publish "src/DsaPractice.Api/DsaPractice.Api.csproj" -c Release -o /app/publish
+RUN dotnet restore "source/DsaPractice.Api/DsaPractice.Api.csproj"
+RUN dotnet publish "source/DsaPractice.Api/DsaPractice.Api.csproj" -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app

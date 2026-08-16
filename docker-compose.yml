@@ -19,7 +19,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: src/DsaPractice.Api/Dockerfile
+      dockerfile: source/DsaPractice.Api/Dockerfile
     ports:
       - "8080:8080"
     depends_on:
@@ -29,7 +29,7 @@ services:
   judge:
     build:
       context: .
-      dockerfile: src/DsaPractice.Judge/Dockerfile
+      dockerfile: source/DsaPractice.Judge/Dockerfile
     depends_on:
       - rabbitmq
     volumes:

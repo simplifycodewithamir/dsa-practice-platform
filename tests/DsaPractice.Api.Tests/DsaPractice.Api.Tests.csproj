@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\DsaPractice.Api\DsaPractice.Api.csproj" />
+    <ProjectReference Include="..\..\source\DsaPractice.Api\DsaPractice.Api.csproj" />
   </ItemGroup>
 
 </Project>

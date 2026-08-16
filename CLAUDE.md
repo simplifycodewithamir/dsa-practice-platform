@@ -12,7 +12,7 @@ Free DSA question-practice platform for students. Personal side-project, MVP-fir
 ## Solution layout
 ```
 DsaPractice.sln
-src/
+source/
   DsaPractice.Api/                  # Minimal API — Questions, Submissions (metadata only, never executes code)
   DsaPractice.Api.DataAccess/       # EF Core, Postgres
   DsaPractice.Api.DataMigrations/   # migrations, split per convention
@@ -27,8 +27,8 @@ frontend/                           # React + TypeScript
 ## Run locally
 ```bash
 docker compose up postgres rabbitmq -d
-dotnet run --project src/DsaPractice.Api
-dotnet run --project src/DsaPractice.Judge
+dotnet run --project source/DsaPractice.Api
+dotnet run --project source/DsaPractice.Judge
 ```
 
 ## Build & test
