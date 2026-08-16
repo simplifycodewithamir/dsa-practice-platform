@@ -314,3 +314,59 @@ flowchart TD
 3. What does `depends_on` **not** guarantee, and how do you fix that? *(readiness, not just start order — fix with `healthcheck` + `condition: service_healthy`)*
 4. How do `api`/`judge` reach `postgres`/`rabbitmq` without a published port? *(shared internal Docker network, addressed by service name)*
 5. What security tradeoff does mounting `/var/run/docker.sock` introduce? *(container effectively gets host-level control over Docker, i.e., near-root on the host)*
+
+## 11. Setting up local env for debugging purpose
+
+1. Most of the dependencies like database postgress, message-queues like RabbitMq, blob like MinIO they provide docker images, we can setup a seperate profile as local in docker compose file and make the local development env easy to debug.
+2. Example
+    ```yaml
+    version: "3.8"
+    services:
+        app:
+            build: .
+            depends_on:
+                - minio
+    minio:
+        image: minio/minio
+        command: server /data
+        ports:
+            - "9000:9000"
+        environment:
+            MINIO_ROOT_USER: minio
+            MINIO_ROOT_PASSWORD: minio123
+      ```
+3. This way, when someone pulls your project, they get both your app and a local MinIO instance ready to use.
+
+## 12. Bind mount vs Named volume
+Both let a container read/write files that live outside its own writable layer. The difference is who manages the storage location.
+
+### Bind mount — host_path:container_path
+```yaml
+volumes:
+  - /var/run/docker.sock:/var/run/docker.sock
+  ```
+
+  - You specify an exact path on your host. Docker just maps it straight through — no abstraction
+  - Full visibility: you can ls that folder yourself, edit files with any tool, and changes are instant in both directions.
+  - Tied to your host's filesystem layout — the path has to exist and make sense on whatever machine runs the container, which makes it non-portable across dev machines/CI/prod.
+  - Used when the container needs to interact with something that's inherently host-specific — a live host resource (like the Docker socket), source code you're live-editing for hot reload, or config files you want to hand-edit outside the container.
+
+  ### Named volume — volume_name:container_path
+  ```yaml
+  volumes:
+  - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:
+  ```
+
+  - You give it a name, not a path. Docker creates and owns the actual storage location (on Linux, typically somewhere under /var/lib/docker/volumes/...) — you're not supposed to touch it directly.
+  - Portable: the same compose file works identically on any machine, because there's no host path baked in.
+  - Lifecycle is decoupled from the container. docker compose down removes containers but leaves named volumes alone. They only get deleted if you explicitly run docker compose down -v or docker volume rm.
+  - Docker-managed performance and driver options (can back it with different storage drivers, including remote/networked storage in production setups).
+  - The right default for stateful data — databases, message broker state, anything you'd be upset to lose.
+
+  Why judge's docker.sock stays a bind mount: it's not data you want Docker to "own" and persist — it's a live control channel to the host's actual Docker Engine at a fixed, well-known path. A named volume would make no sense there; the whole point is that it's the real host file, not a Docker-managed copy.
+
+Why postgres/rabbitmq use named volumes: you don't care where the bytes physically live, you just want them to survive container recreation and not clutter your host filesystem with database internals you'll never touch directly.
+
+One useful command now that you have named volumes: docker volume ls shows them, and docker volume rm dsapractice_pgdata (name gets prefixed with the project/folder name) is how you'd force a full reset if you ever want to start Postgres from scratch.
