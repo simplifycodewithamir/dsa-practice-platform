@@ -1,6 +1,6 @@
 first Prompt
-I am planning to create a project for all my dsa questions practice which i can deploy over web
-over the period of time it can become like leetcode.
+I am planning to create a project for all my dsa questions practice which i can deploy over web.
+Over the period of time it can become like leetcode.
 
 MVP 1 goal - the project can show some questions, which is my own curated question bank, with solutions, explanations, and maybe difficulty tracking
 
