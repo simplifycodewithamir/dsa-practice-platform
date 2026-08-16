@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/DataMigrations/" />
   <Folder Name="/SolutionItems/">
+    <File Path="../.github/workflows/dotnet.yml" />
     <File Path="../.gitignore" />
     <File Path="../CLAUDE.md" />
     <File Path="../docker-compose.yml" />
