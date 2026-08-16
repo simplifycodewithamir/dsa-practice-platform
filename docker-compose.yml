@@ -1,0 +1,37 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: dsapractice
+      POSTGRES_USER: dsapractice
+      POSTGRES_PASSWORD: localdevonly
+    ports:
+      - "5432:5432"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672" # management UI
+
+  api:
+    build:
+      context: .
+      dockerfile: src/DsaPractice.Api/Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - rabbitmq
+
+  judge:
+    build:
+      context: .
+      dockerfile: src/DsaPractice.Judge/Dockerfile
+    depends_on:
+      - rabbitmq
+    volumes:
+      # required so the Judge service can spin up sandbox containers on the host
+      - /var/run/docker.sock:/var/run/docker.sock

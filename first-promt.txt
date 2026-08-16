@@ -1,0 +1,17 @@
+first Prompt
+I am planning to create a project for all my dsa questions practice which i can deploy over web
+over the period of time it can become like leetcode.
+
+MVP 1 goal - the project can show some questions, which is my own curated question bank, with solutions, explanations, and maybe difficulty tracking
+
+Tech stack:
+Backend: ASP.NET Core Web API (.NET 10), EF Core + PostgreSQL
+Frontend: React + TypeScript, with a code editor component (Monaco Editor — same engine VS Code uses, free and embeddable)
+Auth: ASP.NET Core Identity
+Containerization: Docker
+
+Code execution/judging module: - An isolated code-execution judge system with async processing
+Don't execute user code directly on the API server — security risk (arbitrary code execution). Use an isolated, sandboxed execution model.
+MVP approach: a separate lightweight "Judge" microservice that spins up ephemeral Docker containers per submission, runs the code against test cases with strict CPU/memory/time limits, captures output, tears the container down. 
+
+Flow: User submits code → API publishes a "judge this submission" message to kafka with dapr as abstract layer → Judge service consumes it, runs code in a sandboxed container, publishes result back → API updates submission status, notifies frontend (SignalR or polling or server-sent-events using EventSource).
