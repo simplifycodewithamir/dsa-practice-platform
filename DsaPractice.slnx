@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="src/DsaPractice.Api.DataAccess/DsaPractice.Api.DataAccess.csproj" />
+  <Project Path="src/DsaPractice.Api.DataMigrations/DsaPractice.Api.DataMigrations.csproj" />
+  <Project Path="src/DsaPractice.Api/DsaPractice.Api.csproj" />
+  <Project Path="src/DsaPractice.Contracts/DsaPractice.Contracts.csproj" />
+  <Project Path="src/DsaPractice.Judge/DsaPractice.Judge.csproj" />
+  <Project Path="tests/DsaPractice.Api.Tests/DsaPractice.Api.Tests.csproj" />
+  <Project Path="tests/DsaPractice.Judge.Tests/DsaPractice.Judge.Tests.csproj" />
+</Solution>
