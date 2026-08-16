@@ -1,8 +1,8 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-WORKDIR /src
+WORKDIR /source
 COPY . .
-RUN dotnet restore "src/DsaPractice.Judge/DsaPractice.Judge.csproj"
-RUN dotnet publish "src/DsaPractice.Judge/DsaPractice.Judge.csproj" -c Release -o /app/publish
+RUN dotnet restore "source/DsaPractice.Judge/DsaPractice.Judge.csproj"
+RUN dotnet publish "source/DsaPractice.Judge/DsaPractice.Judge.csproj" -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/runtime:10.0 AS final
 WORKDIR /app

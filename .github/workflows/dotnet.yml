@@ -22,10 +22,10 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore
-        run: dotnet restore DsaPractice.slnx
+        run: dotnet restore source/DsaPractice.slnx
 
       - name: Build
-        run: dotnet build DsaPractice.slnx --configuration Release --no-restore
+        run: dotnet build source/DsaPractice.slnx --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test DsaPractice.slnx --configuration Release --no-build --verbosity normal
+        run: dotnet test source/DsaPractice.slnx --configuration Release --no-build --verbosity normal

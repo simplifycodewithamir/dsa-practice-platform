@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/DataMigrations/" />
+  <Folder Name="/SolutionItems/">
+    <File Path="../.github/workflows/dotnet.yml" />
+    <File Path="../.gitignore" />
+    <File Path="../CLAUDE.md" />
+    <File Path="../docker-compose.yml" />
+    <File Path="../first-promt.txt" />
+    <File Path="Directory.Build.targets" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="../tests/DsaPractice.Api.Tests/DsaPractice.Api.Tests.csproj" />
+    <Project Path="../tests/DsaPractice.Judge.Tests/DsaPractice.Judge.UnitTests.csproj" />
+  </Folder>
+  <Project Path="DsaPractice.Api.DataAccess/DsaPractice.Api.DataAccess.csproj" />
+  <Project Path="DsaPractice.Api/DsaPractice.Api.csproj" />
+  <Project Path="DsaPractice.Contracts/DsaPractice.Contracts.csproj" />
+  <Project Path="DsaPractice.Judge/DsaPractice.Judge.csproj" />
+</Solution>
