@@ -1,3 +1,5 @@
+using DsaPractice.Judge;
+
 var builder = Host.CreateApplicationBuilder(args);
 
 // TODO: register RabbitMQ consumer as a BackgroundService
