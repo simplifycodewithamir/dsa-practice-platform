@@ -24,6 +24,8 @@ services:
       dockerfile: source/DsaPractice.Api/Dockerfile
     ports:
       - "8080:8080"
+    environment:
+      ConnectionStrings__DsaPractice: "Host=postgres;Port=5432;Database=dsapractice;Username=dsapractice;Password=localdevonly"
     depends_on:
       - postgres
       - rabbitmq
