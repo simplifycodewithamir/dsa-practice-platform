@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DsaPractice.Api.DataAccess\DsaPractice.Api.DataAccess.csproj" />
+    <ProjectReference Include="..\..\DsaPractice.DataAccess\DsaPractice.DataAccess.csproj" />
   </ItemGroup>
 
 </Project>

@@ -9,19 +9,19 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi"  />
-    <PackageReference Include="OpenTelemetry.Api"  />
-    <PackageReference Include="Scalar.AspNetCore"  />
-    <PackageReference Include="FluentValidation.AspNetCore"  />
-    <PackageReference Include="Serilog.AspNetCore"  />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="OpenTelemetry.Api" />
+    <PackageReference Include="Scalar.AspNetCore" />
+    <PackageReference Include="FluentValidation.AspNetCore" />
+    <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
-    <PackageReference Include="Microsoft.FeatureManagement.AspNetCore"  />
-    <PackageReference Include="RabbitMQ.Client"  />
-    <PackageReference Include="SSH.NET"  />
+    <PackageReference Include="Microsoft.FeatureManagement.AspNetCore" />
+    <PackageReference Include="RabbitMQ.Client" />
+    <PackageReference Include="SSH.NET" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DsaPractice.Api.DataAccess\DsaPractice.Api.DataAccess.csproj" />
+    <ProjectReference Include="..\DsaPractice.Api.DataAccess\DsaPractice.DataAccess.csproj" />
     <ProjectReference Include="..\DsaPractice.Contracts\DsaPractice.Contracts.csproj" />
   </ItemGroup>
 
