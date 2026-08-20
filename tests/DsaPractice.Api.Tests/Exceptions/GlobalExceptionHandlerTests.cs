@@ -11,13 +11,11 @@ namespace DsaPractice.Api.Tests.Exceptions;
 public class GlobalExceptionHandlerTests
 {
     [Fact]
-    public async Task TryHandleAsync_DomainException_MapsToItsStatusCodeAndErrorCode()
+    public async Task TryHandleAsync_ApiException_MapsToItsStatusCodeAndTitle()
     {
         var (handler, context) = CreateSut();
-        var exception = new DsaPracticeAppException(
-            new ErrorTitle("notfound"), 
-            StatusCodes.Status404NotFound, 
-            "Requested question is not found", 
+        var exception = new NotFoundException(
+            "Requested question is not found",
             new { question = new { id = "123" } });
 
         var handled = await handler.TryHandleAsync(context, exception, CancellationToken.None);
@@ -26,10 +24,9 @@ public class GlobalExceptionHandlerTests
         Assert.Equal(StatusCodes.Status404NotFound, context.Response.StatusCode);
 
         var problemDetails = await ReadProblemDetailsAsync(context);
-        var extendedDetails = GetExtendedDetails(problemDetails);
         Assert.Equal("api.error.notfound", problemDetails.Title);
         Assert.Equal(exception.Message, problemDetails.Detail);
-        Assert.Equal("{\"question\":{\"id\":\"123\"}}", extendedDetails);
+        Assert.Equal("{\"question\":{\"id\":\"123\"}}", GetExtendedDetails(problemDetails));
     }
 
     [Fact]
@@ -44,10 +41,10 @@ public class GlobalExceptionHandlerTests
         Assert.Equal(StatusCodes.Status500InternalServerError, context.Response.StatusCode);
 
         var problemDetails = await ReadProblemDetailsAsync(context);
-        var extendedDetails = GetExtendedDetails(problemDetails);
-        Assert.Equal("Host=db;Password=super-secret", problemDetails.Detail);
-        Assert.Equal("api.error.unknownError", problemDetails.Title);
-        Assert.Equal("{\"extendedDetail\":\"An unexpected error occurred.\"}", extendedDetails);
+        Assert.Equal("api.error.unknown", problemDetails.Title);
+        Assert.Equal("An unexpected error occurred.", problemDetails.Detail);
+        Assert.DoesNotContain("super-secret", problemDetails.Detail);
+        Assert.Equal("null", GetExtendedDetails(problemDetails));
     }
 
     private static (GlobalExceptionHandler Handler, DefaultHttpContext Context) CreateSut()
@@ -77,6 +74,6 @@ public class GlobalExceptionHandlerTests
         return Assert.IsType<ProblemDetails>(problemDetails);
     }
 
-    private static string? GetExtendedDetails(ProblemDetails problemDetails) => 
+    private static string? GetExtendedDetails(ProblemDetails problemDetails) =>
         JsonSerializer.Serialize(problemDetails.Extensions["extendedDetail"]);
 }

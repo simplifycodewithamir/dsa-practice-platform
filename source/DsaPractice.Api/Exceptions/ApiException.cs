@@ -3,15 +3,10 @@ namespace DsaPractice.Api.Exceptions;
 /// <summary>
 /// Base for expected, meaningful failures. The global exception handler maps these to ProblemDetails.
 /// </summary>
-internal abstract class ApiException(ErrorTitle errorTitle, int httpStatusCode, string detail) : Exception(detail)
+internal abstract class ApiException(string title, int httpStatusCode, string detail, object? extendedDetail = null)
+    : Exception(detail)
 {
-    public ErrorTitle ErrorTitle { get; } = errorTitle;
+    public string Title { get; } = title;
     public int HttpStatusCode { get; } = httpStatusCode;
-    public object? ExtendedDetail { get; }
-
-    protected ApiException(ErrorTitle errorCode, int httpStatusCode, string message, object? extendedDetail) 
-        : this(errorCode, httpStatusCode, message)
-    {
-        ExtendedDetail = extendedDetail;
-    }
+    public object? ExtendedDetail { get; } = extendedDetail;
 }

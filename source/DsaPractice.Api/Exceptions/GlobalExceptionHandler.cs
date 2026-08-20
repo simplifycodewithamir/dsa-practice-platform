@@ -11,10 +11,10 @@ public sealed class GlobalExceptionHandler(
     {
         logger.LogError(exception, "An unhandled exception occurred while processing the request.");
 
-        (string errorTitle, int httpStatusCode, string detail, object? extendedDetail) = exception switch
+        (string title, int httpStatusCode, string detail, object? extendedDetail) = exception switch
         {
-            DsaPracticeAppException appException => (appException.ErrorTitle.ToString(), appException.HttpStatusCode, appException.Message, appException.ExtendedDetail),
-            _ => (new ErrorTitle("unknownError").ToString(), StatusCodes.Status500InternalServerError, exception.Message, new {extendedDetail= "An unexpected error occurred." })
+            ApiException apiException => (apiException.Title, apiException.HttpStatusCode, apiException.Message, apiException.ExtendedDetail),
+            _ => ("api.error.unknown", StatusCodes.Status500InternalServerError, "An unexpected error occurred.", null)
         };
 
         httpContext.Response.StatusCode = httpStatusCode;
@@ -25,7 +25,7 @@ public sealed class GlobalExceptionHandler(
             Exception = exception,
             ProblemDetails =
             {
-                Title = errorTitle,
+                Title = title,
                 Status = httpStatusCode,
                 Detail = detail,
                 Extensions = { ["extendedDetail"] = extendedDetail }

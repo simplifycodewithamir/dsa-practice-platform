@@ -19,7 +19,7 @@ public static class QuestionsEndpoints
 
     private static IResult GetQuestionById(Guid id)
     {
-        // TODO: throw QuestionNotFoundException if missing -> global handler maps to ProblemDetails
+        // TODO: throw NotFoundException if missing -> global handler maps to ProblemDetails
         return Results.Ok();
     }
 }
