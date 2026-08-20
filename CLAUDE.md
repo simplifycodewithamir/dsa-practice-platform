@@ -26,10 +26,22 @@ frontend/                           # React + TypeScript
 
 ## Run locally
 ```bash
+cp .env.example .env   # one-time — Postgres creds for docker-compose, gitignored
+
+# one-time — Postgres connection string, kept out of source control via dotnet user-secrets
+dotnet user-secrets set "ConnectionStrings:DsaPractice" \
+  "Host=localhost;Port=5432;Database=dsapractice;Username=dsapractice;Password=<your .env password>" \
+  --project source/DsaPractice.Api
+
 docker compose up postgres rabbitmq -d
 dotnet run --project source/DsaPractice.Api
 dotnet run --project source/DsaPractice.Judge
 ```
+
+Secrets: never commit connection strings/passwords. `DsaPractice.Api` and the migrations project
+(`DsaPractice.DataMigrations.Postgres`) share one `UserSecretsId`, so `dotnet user-secrets set` run
+against either project supplies both. docker-compose reads Postgres creds from a gitignored `.env`
+(`.env.example` is the checked-in template).
 
 ## Build & test
 ```bash

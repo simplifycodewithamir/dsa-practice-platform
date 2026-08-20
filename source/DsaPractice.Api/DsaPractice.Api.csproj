@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <UserSecretsId>b016cfe2-2a62-4213-a3bb-f012f0d9bb83</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

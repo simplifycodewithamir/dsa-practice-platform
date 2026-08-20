@@ -43,6 +43,14 @@ source-code/
 
 ## Local dev
 ```bash
+cp .env.example .env                    # one-time: local Postgres creds for docker-compose (gitignored)
+
+# one-time: local Postgres connection string, kept out of source control via dotnet user-secrets
+# (shared UserSecretsId between DsaPractice.Api and the migrations project — set once, both see it)
+dotnet user-secrets set "ConnectionStrings:DsaPractice" \
+  "Host=localhost;Port=5432;Database=dsapractice;Username=dsapractice;Password=<your .env password>" \
+  --project source/DsaPractice.Api
+
 docker compose up postgres rabbitmq -d
 dotnet run --project source/DsaPractice.Api
 dotnet run --project source/DsaPractice.Judge
