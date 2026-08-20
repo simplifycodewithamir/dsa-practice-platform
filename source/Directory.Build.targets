@@ -15,6 +15,11 @@
 	<PackageReference Update="Microsoft.Extensions.Hosting" Version="10.0.11" />
 	<PackageReference Update="Docker.DotNet" Version="3.125.*" />
 	<PackageReference Update="Serilog.Extensions.Hosting" Version="10.0.0" />
+	<PackageReference Update="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
+		<PrivateAssets>all</PrivateAssets>
+	</PackageReference>
+	<PackageReference Update="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.0" />
+	<PackageReference Update="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.0" />
 	
   </ItemGroup>
 
