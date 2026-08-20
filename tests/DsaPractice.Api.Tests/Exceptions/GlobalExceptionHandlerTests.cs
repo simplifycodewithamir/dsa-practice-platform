@@ -14,7 +14,11 @@ public class GlobalExceptionHandlerTests
     public async Task TryHandleAsync_DomainException_MapsToItsStatusCodeAndErrorCode()
     {
         var (handler, context) = CreateSut();
-        var exception = new QuestionNotFoundException(Guid.Parse("11111111-1111-1111-1111-111111111111"));
+        var exception = new DsaPracticeAppException(
+            new ErrorTitle("notfound"), 
+            StatusCodes.Status404NotFound, 
+            "Requested question is not found", 
+            new { question = new { id = "123" } });
 
         var handled = await handler.TryHandleAsync(context, exception, CancellationToken.None);
 
@@ -22,8 +26,10 @@ public class GlobalExceptionHandlerTests
         Assert.Equal(StatusCodes.Status404NotFound, context.Response.StatusCode);
 
         var problemDetails = await ReadProblemDetailsAsync(context);
-        Assert.Equal(exception.Message, problemDetails.Title);
-        Assert.Equal("api.error.notfound", GetErrorCode(problemDetails));
+        var extendedDetails = GetExtendedDetails(problemDetails);
+        Assert.Equal("api.error.notfound", problemDetails.Title);
+        Assert.Equal(exception.Message, problemDetails.Detail);
+        Assert.Equal("{\"question\":{\"id\":\"123\"}}", extendedDetails);
     }
 
     [Fact]
@@ -38,8 +44,10 @@ public class GlobalExceptionHandlerTests
         Assert.Equal(StatusCodes.Status500InternalServerError, context.Response.StatusCode);
 
         var problemDetails = await ReadProblemDetailsAsync(context);
-        Assert.Equal("An unexpected error occurred.", problemDetails.Title);
-        Assert.Equal("api.error.internal", GetErrorCode(problemDetails));
+        var extendedDetails = GetExtendedDetails(problemDetails);
+        Assert.Equal("Host=db;Password=super-secret", problemDetails.Detail);
+        Assert.Equal("api.error.unknownError", problemDetails.Title);
+        Assert.Equal("{\"extendedDetail\":\"An unexpected error occurred.\"}", extendedDetails);
     }
 
     private static (GlobalExceptionHandler Handler, DefaultHttpContext Context) CreateSut()
@@ -69,6 +77,6 @@ public class GlobalExceptionHandlerTests
         return Assert.IsType<ProblemDetails>(problemDetails);
     }
 
-    private static string? GetErrorCode(ProblemDetails problemDetails) =>
-        ((JsonElement)problemDetails.Extensions["errorCode"]!).GetString();
+    private static string? GetExtendedDetails(ProblemDetails problemDetails) => 
+        JsonSerializer.Serialize(problemDetails.Extensions["extendedDetail"]);
 }

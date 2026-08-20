@@ -9,18 +9,15 @@ public sealed class GlobalExceptionHandler(
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        var (statusCode, errorCode, title) = exception switch
+        logger.LogError(exception, "An unhandled exception occurred while processing the request.");
+
+        (string errorTitle, int httpStatusCode, string detail, object? extendedDetail) = exception switch
         {
-            DomainException domainException => (domainException.HttpStatusCode, domainException.ErrorCode, domainException.Message),
-            _ => (StatusCodes.Status500InternalServerError, "api.error.internal", "An unexpected error occurred.")
+            DsaPracticeAppException appException => (appException.ErrorTitle.ToString(), appException.HttpStatusCode, appException.Message, appException.ExtendedDetail),
+            _ => (new ErrorTitle("unknownError").ToString(), StatusCodes.Status500InternalServerError, exception.Message, new {extendedDetail= "An unexpected error occurred." })
         };
 
-        if (exception is not DomainException)
-        {
-            logger.LogError(exception, "Unhandled exception processing {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
-        }
-
-        httpContext.Response.StatusCode = statusCode;
+        httpContext.Response.StatusCode = httpStatusCode;
 
         return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {
@@ -28,9 +25,10 @@ public sealed class GlobalExceptionHandler(
             Exception = exception,
             ProblemDetails =
             {
-                Status = statusCode,
-                Title = title,
-                Extensions = { ["errorCode"] = errorCode }
+                Title = errorTitle,
+                Status = httpStatusCode,
+                Detail = detail,
+                Extensions = { ["extendedDetail"] = extendedDetail }
             }
         });
     }
