@@ -1,4 +1,5 @@
 using DsaPractice.Api.DataAccess;
+using DsaPractice.Api.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Serilog;
@@ -11,10 +12,14 @@ builder.Host.UseSerilog((context, config) =>
 builder.Services.AddDbContext<DsaPracticeDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DsaPractice")));
 
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 // TODO: register RabbitMQ publisher, FluentValidation, FeatureManagement, OpenTelemetry
-// TODO: register global exception handler -> ProblemDetails mapping (see dotnet-production-code skill)
 
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {
@@ -31,3 +36,5 @@ app.UseHttpsRedirection();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
 app.Run();
+
+public partial class Program;
