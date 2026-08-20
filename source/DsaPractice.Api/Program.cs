@@ -1,3 +1,5 @@
+using DsaPractice.Api.DataAccess;
+using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Serilog;
 
@@ -6,7 +8,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((context, config) =>
     config.ReadFrom.Configuration(context.Configuration));
 
-// TODO: register DataAccess (AddDbContext), RabbitMQ publisher, FluentValidation, FeatureManagement, OpenTelemetry
+builder.Services.AddDbContext<DsaPracticeDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DsaPractice")));
+
+// TODO: register RabbitMQ publisher, FluentValidation, FeatureManagement, OpenTelemetry
 // TODO: register global exception handler -> ProblemDetails mapping (see dotnet-production-code skill)
 
 var app = builder.Build();

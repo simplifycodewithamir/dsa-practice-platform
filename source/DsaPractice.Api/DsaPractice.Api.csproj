@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <UserSecretsId>b016cfe2-2a62-4213-a3bb-f012f0d9bb83</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DsaPractice.Api.DataAccess\DsaPractice.DataAccess.csproj" />
+    <ProjectReference Include="..\DsaPractice.DataAccess\DsaPractice.DataAccess.csproj" />
     <ProjectReference Include="..\DsaPractice.Contracts\DsaPractice.Contracts.csproj" />
   </ItemGroup>
 
