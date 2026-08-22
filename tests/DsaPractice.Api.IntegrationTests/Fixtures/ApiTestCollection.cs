@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace DsaPractice.Api.Tests.Fixtures;
+namespace DsaPractice.Api.IntegrationTests.Fixtures;
 
 [CollectionDefinition(Name)]
 public sealed class ApiTestCollection : ICollectionFixture<ApiWebApplicationFactory>

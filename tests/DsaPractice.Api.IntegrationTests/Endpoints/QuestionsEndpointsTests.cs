@@ -3,12 +3,12 @@ using System.Net.Http.Json;
 using DsaPractice.Api.DataAccess;
 using DsaPractice.Api.DataAccess.Entities;
 using DsaPractice.Api.Endpoints;
-using DsaPractice.Api.Tests.Fixtures;
+using DsaPractice.Api.IntegrationTests.Fixtures;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DsaPractice.Api.Tests.Endpoints;
+namespace DsaPractice.Api.IntegrationTests.Endpoints;
 
 [Collection(ApiTestCollection.Name)]
 public class QuestionsEndpointsTests(ApiWebApplicationFactory factory)

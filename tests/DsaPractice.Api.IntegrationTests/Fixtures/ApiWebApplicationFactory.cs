@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
 using Xunit;
 
-namespace DsaPractice.Api.Tests.Fixtures;
+namespace DsaPractice.Api.IntegrationTests.Fixtures;
 
 public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {

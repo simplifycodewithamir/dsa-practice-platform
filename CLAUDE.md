@@ -19,7 +19,8 @@ source/
   DsaPractice.Judge/                # Worker service — sandboxed code execution
   DsaPractice.Contracts/            # shared RabbitMQ message DTOs
 tests/
-  DsaPractice.Api.Tests/
+  DsaPractice.Api.UnitTests/
+  DsaPractice.Api.IntegrationTests/
   DsaPractice.Judge.Tests/
 frontend/                           # React + TypeScript
 ```

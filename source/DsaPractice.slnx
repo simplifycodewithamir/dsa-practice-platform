@@ -11,7 +11,8 @@
     <File Path="Directory.Build.targets" />
   </Folder>
   <Folder Name="/Tests/">
-    <Project Path="../tests/DsaPractice.Api.Tests/DsaPractice.Api.Tests.csproj" />
+    <Project Path="../tests/DsaPractice.Api.UnitTests/DsaPractice.Api.UnitTests.csproj" />
+    <Project Path="../tests/DsaPractice.Api.IntegrationTests/DsaPractice.Api.IntegrationTests.csproj" />
     <Project Path="../tests/DsaPractice.Judge.Tests/DsaPractice.Judge.UnitTests.csproj" />
   </Folder>
   <Project Path="DsaPractice.Api/DsaPractice.Api.csproj" />
