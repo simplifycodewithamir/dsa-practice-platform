@@ -2,7 +2,7 @@ using DsaPractice.Api.Services;
 
 namespace DsaPractice.Api.Endpoints;
 
-public static class QuestionsEndpoints
+internal static class QuestionsEndpoints
 {
     public static RouteGroupBuilder MapQuestionsEndpoints(this RouteGroupBuilder group)
     {

@@ -19,7 +19,9 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+// Explicit registration, not AddValidatorsFromAssemblyContaining<Program>() --
+// its assembly scan doesn't reliably discover internal IValidator<T> implementations.
+builder.Services.AddScoped<IValidator<CreateSubmissionRequest>, CreateSubmissionRequestValidator>();
 builder.Services.AddOpenApi();
 
 builder.Services.AddScoped<IQuestionsService, QuestionsService>();

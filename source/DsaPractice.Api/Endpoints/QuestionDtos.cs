@@ -2,11 +2,11 @@ using DsaPractice.Api.DataAccess.Entities;
 
 namespace DsaPractice.Api.Endpoints;
 
-public sealed record QuestionSummaryResponse(Guid Id, string Title, string Difficulty);
+internal sealed record QuestionSummaryResponse(Guid Id, string Title, string Difficulty);
 
-public sealed record TestCaseResponse(Guid Id, string Input, string ExpectedOutput);
+internal sealed record TestCaseResponse(Guid Id, string Input, string ExpectedOutput);
 
-public sealed record QuestionDetailResponse(
+internal sealed record QuestionDetailResponse(
     Guid Id,
     string Title,
     string Description,

@@ -3,9 +3,9 @@ using FluentValidation;
 
 namespace DsaPractice.Api.Endpoints;
 
-public sealed record CreateSubmissionRequest(Guid QuestionId, string UserId, string Language, string SourceCode);
+internal sealed record CreateSubmissionRequest(Guid QuestionId, string UserId, string Language, string SourceCode);
 
-public sealed record SubmissionResponse(
+internal sealed record SubmissionResponse(
     Guid Id,
     Guid QuestionId,
     string UserId,
@@ -22,7 +22,7 @@ public sealed record SubmissionResponse(
         submission.SubmittedAtUtc);
 }
 
-public sealed class CreateSubmissionRequestValidator : AbstractValidator<CreateSubmissionRequest>
+internal sealed class CreateSubmissionRequestValidator : AbstractValidator<CreateSubmissionRequest>
 {
     // v1 scope — see dsa-practice-platform skill: C# and Python only.
     public static readonly string[] SupportedLanguages = ["csharp", "python"];

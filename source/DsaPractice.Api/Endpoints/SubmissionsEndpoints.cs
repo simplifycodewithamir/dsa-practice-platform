@@ -4,7 +4,7 @@ using FluentValidation;
 
 namespace DsaPractice.Api.Endpoints;
 
-public static class SubmissionsEndpoints
+internal static class SubmissionsEndpoints
 {
     public static RouteGroupBuilder MapSubmissionsEndpoints(this RouteGroupBuilder group)
     {
