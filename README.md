@@ -53,10 +53,33 @@ dotnet user-secrets set "ConnectionStrings:DsaPractice" \
   "Host=localhost;Port=5432;Database=dsapractice;Username=dsapractice;Password=<your .env password>" \
   --project source/DsaPractice.Api
 
-docker compose up postgres rabbitmq -d
+docker compose up -d    # Postgres + RabbitMQ, and a one-shot "migrator" that applies
+                         # pending EF Core migrations then exits -- no manual `dotnet ef`
+                         # step needed. Re-run `docker compose run --rm migrator` any time
+                         # you just want the schema brought up to date on its own (e.g.
+                         # after pulling a new migration).
 dotnet run --project source/DsaPractice.Api
 dotnet run --project source/DsaPractice.Judge
 ```
+
+`docker compose --profile full-stack up -d --build` additionally builds and runs `api`/`judge`
+themselves in containers (`http://localhost:8080/scalar`) instead of via `dotnet run` — useful
+for testing the actual Docker images, not needed for day-to-day local dev.
+
+## Run and debug in VS Code
+
+Prerequisites: the one-time `user-secrets`/`.env` setup above, and `docker compose up -d` running
+(Postgres + the migrator — see "Local dev").
+
+- Open the Run and Debug panel (`Ctrl+Shift+D` / `Cmd+Shift+D`), pick **DsaPractice.Api** or
+  **DsaPractice.Judge** from the dropdown, press the green play button (or `F5`).
+- `.vscode/launch.json` builds the selected project first (via `.vscode/tasks.json`), then launches
+  it with the debugger attached — breakpoints, step-through, the works.
+- For the Api, once you see `Now listening on: http://localhost:51942` in the Debug Console, VS
+  Code opens `http://localhost:51942/scalar` automatically.
+- Both configs are independent — running one doesn't start the other. To exercise the full
+  submission flow end to end you'd eventually run both, same as the two `dotnet run` commands
+  above.
 
 ## Conventions
 Follows the user's standard `dotnet-production-code`, `dotnet-testing`, `react-frontend`, `git-workflow` skills, plus the project-specific `dsa-practice-platform` skill for the Judge architecture and MVP scope boundaries. Read the project skill before extending scope past v1 (more languages, leaderboard, etc.) — it's intentionally capped for now.

@@ -1,0 +1,37 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "DsaPractice.Api",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-api",
+      "program": "${workspaceFolder}/source/DsaPractice.Api/bin/Debug/net10.0/DsaPractice.Api.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/source/DsaPractice.Api",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:51942"
+      },
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+        "uriFormat": "%s/scalar"
+      }
+    },
+    {
+      "name": "DsaPractice.Judge",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-judge",
+      "program": "${workspaceFolder}/source/DsaPractice.Judge/bin/Debug/net10.0/DsaPractice.Judge.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/source/DsaPractice.Judge",
+      "stopAtEntry": false,
+      "env": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  ]
+}
