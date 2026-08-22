@@ -19,6 +19,7 @@ builder.Services.AddProblemDetails();
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+builder.Services.AddOpenApi();
 
 // TODO: register RabbitMQ publisher, FeatureManagement, OpenTelemetry
 
