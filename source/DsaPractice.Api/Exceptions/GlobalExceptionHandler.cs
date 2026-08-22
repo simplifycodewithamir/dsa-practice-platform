@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Http;
 
 namespace DsaPractice.Api.Exceptions;
 
