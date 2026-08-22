@@ -21,7 +21,7 @@ source/
 tests/
   DsaPractice.Api.UnitTests/
   DsaPractice.Api.IntegrationTests/
-  DsaPractice.Judge.Tests/
+  DsaPractice.Judge.UnitTests/
 frontend/                           # React + TypeScript
 ```
 

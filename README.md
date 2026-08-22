@@ -17,7 +17,7 @@ source-code/
 ├── tests/
 │   ├── DsaPractice.Api.UnitTests/
 │   ├── DsaPractice.Api.IntegrationTests/
-│   └── DsaPractice.Judge.Tests/
+│   └── DsaPractice.Judge.UnitTests/
 ├── frontend/                             # React + TypeScript (not yet scaffolded)
 ├── .github/workflows/ci.yml
 └── docker-compose.yml                    # Postgres + RabbitMQ + both services, local dev
