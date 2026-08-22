@@ -4,7 +4,7 @@
 	<PackageReference Update="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
 	<PackageReference Update="OpenTelemetry.Api" Version="1.17.0" />
 	<PackageReference Update="Scalar.AspNetCore" Version="2.16.20" />
-	<PackageReference Update="FluentValidation.AspNetCore" Version="11.3.*" />
+	<PackageReference Update="FluentValidation" Version="12.1.*" />
 	<PackageReference Update="Serilog.AspNetCore" Version="10.0.0" />
 	<PackageReference Update="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
 	<PackageReference Update="Microsoft.FeatureManagement.AspNetCore" Version="4.6.0" />
