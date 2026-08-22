@@ -1,6 +1,4 @@
-using DsaPractice.Api.DataAccess;
-using DsaPractice.Api.Exceptions;
-using Microsoft.EntityFrameworkCore;
+using DsaPractice.Api.Services;
 
 namespace DsaPractice.Api.Endpoints;
 
@@ -14,25 +12,15 @@ public static class QuestionsEndpoints
         return group;
     }
 
-    private static async Task<IResult> GetQuestions(DsaPracticeDbContext db, CancellationToken cancellationToken)
+    private static async Task<IResult> GetQuestions(IQuestionsService questionsService, CancellationToken cancellationToken)
     {
-        var questions = await db.Questions
-            .AsNoTracking()
-            .OrderBy(q => q.Title)
-            .Select(q => new QuestionSummaryResponse(q.Id, q.Title, q.Difficulty))
-            .ToListAsync(cancellationToken);
-
+        var questions = await questionsService.GetQuestionsAsync(cancellationToken);
         return Results.Ok(questions);
     }
 
-    private static async Task<IResult> GetQuestionById(Guid id, DsaPracticeDbContext db, CancellationToken cancellationToken)
+    private static async Task<IResult> GetQuestionById(Guid id, IQuestionsService questionsService, CancellationToken cancellationToken)
     {
-        var question = await db.Questions
-            .AsNoTracking()
-            .Include(q => q.TestCases.Where(tc => !tc.IsHidden))
-            .FirstOrDefaultAsync(q => q.Id == id, cancellationToken)
-            ?? throw new NotFoundException($"Question '{id}' was not found.");
-
-        return Results.Ok(QuestionDetailResponse.FromEntity(question));
+        var question = await questionsService.GetQuestionByIdAsync(id, cancellationToken);
+        return Results.Ok(question);
     }
 }
