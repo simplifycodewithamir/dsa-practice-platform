@@ -27,5 +27,10 @@ jobs:
       - name: Build
         run: dotnet build source/DsaPractice.slnx --configuration Release --no-restore
 
-      - name: Test
-        run: dotnet test source/DsaPractice.slnx --configuration Release --no-build --verbosity normal
+      - name: Unit tests
+        run: |
+          dotnet test tests/DsaPractice.Api.UnitTests/DsaPractice.Api.UnitTests.csproj --configuration Release --no-build --verbosity normal
+          dotnet test tests/DsaPractice.Judge.UnitTests/DsaPractice.Judge.UnitTests.csproj --configuration Release --no-build --verbosity normal
+
+      - name: Integration tests
+        run: dotnet test tests/DsaPractice.Api.IntegrationTests/DsaPractice.Api.IntegrationTests.csproj --configuration Release --no-build --verbosity normal

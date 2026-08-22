@@ -1,5 +1,7 @@
 using DsaPractice.Api.DataAccess;
+using DsaPractice.Api.Endpoints;
 using DsaPractice.Api.Exceptions;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Serilog;
@@ -15,7 +17,11 @@ builder.Services.AddDbContext<DsaPracticeDbContext>(options =>
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
-// TODO: register RabbitMQ publisher, FluentValidation, FeatureManagement, OpenTelemetry
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+builder.Services.AddOpenApi();
+
+// TODO: register RabbitMQ publisher, FeatureManagement, OpenTelemetry
 
 var app = builder.Build();
 
@@ -29,9 +35,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Endpoint groups — one file per resource, per convention. Stubs below, implement in DsaPractice.Api/Endpoints/
-// app.MapGroup("/api/v1/questions").MapQuestionsEndpoints();
-// app.MapGroup("/api/v1/submissions").MapSubmissionsEndpoints();
+app.MapGroup("/api/v1/questions").MapQuestionsEndpoints();
+app.MapGroup("/api/v1/submissions").MapSubmissionsEndpoints();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
