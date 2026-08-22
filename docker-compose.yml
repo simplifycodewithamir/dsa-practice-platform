@@ -1,3 +1,11 @@
+# Local development only. Production deployment is deliberately out of scope for now
+# (solo MVP stage — see the dsa-practice-platform skill's CI/CD deviation note); revisit
+# under the cicd-pipeline skill's pattern (K8s manifests, managed Postgres/RabbitMQ) when
+# this needs a real prod-grade rollout. Nothing here is a template for that.
+#
+# Default (no --profile flag) brings up just the infra -- Postgres + RabbitMQ -- so you can
+# run Api/Judge yourself via `dotnet run` or a debugger (see README "Run and debug in VS Code").
+# `docker compose --profile full-stack up -d --build` also builds and runs the app containers.
 services:
   postgres:
     image: postgres:16
@@ -9,6 +17,11 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -18,19 +31,39 @@ services:
     volumes:
       - rabbitmqdata:/var/lib/rabbitmq
 
+  # One-shot: applies pending EF Core migrations, then exits. Run standalone whenever you
+  # just need the schema up to date (e.g. before debugging Api locally against dockerized
+  # Postgres): `docker compose run --rm migrator`. Also gates `api` in the full-stack profile.
+  migrator:
+    build:
+      context: .
+      dockerfile: source/DataMigrations/DsaPractice.DataMigrations.Postgres/Dockerfile
+    environment:
+      ConnectionStrings__DsaPractice: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
+    profiles: ["full-stack"]
     build:
       context: .
       dockerfile: source/DsaPractice.Api/Dockerfile
     ports:
       - "8080:8080"
     environment:
+      ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DsaPractice: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
     depends_on:
-      - postgres
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      migrator:
+        condition: service_completed_successfully
 
   judge:
+    profiles: ["full-stack"]
     build:
       context: .
       dockerfile: source/DsaPractice.Judge/Dockerfile

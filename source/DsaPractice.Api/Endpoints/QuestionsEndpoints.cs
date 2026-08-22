@@ -1,6 +1,8 @@
+using DsaPractice.Api.Services;
+
 namespace DsaPractice.Api.Endpoints;
 
-public static class QuestionsEndpoints
+internal static class QuestionsEndpoints
 {
     public static RouteGroupBuilder MapQuestionsEndpoints(this RouteGroupBuilder group)
     {
@@ -10,16 +12,15 @@ public static class QuestionsEndpoints
         return group;
     }
 
-    // TODO: inject IQuestionsRepository (or DbContext directly, per project convention), CancellationToken
-    private static IResult GetQuestions()
+    private static async Task<IResult> GetQuestions(IQuestionsService questionsService, CancellationToken cancellationToken)
     {
-        // TODO: AsNoTracking() read, pagination
-        return Results.Ok(Array.Empty<object>());
+        var questions = await questionsService.GetQuestionsAsync(cancellationToken);
+        return Results.Ok(questions);
     }
 
-    private static IResult GetQuestionById(Guid id)
+    private static async Task<IResult> GetQuestionById(Guid id, IQuestionsService questionsService, CancellationToken cancellationToken)
     {
-        // TODO: throw NotFoundException if missing -> global handler maps to ProblemDetails
-        return Results.Ok();
+        var question = await questionsService.GetQuestionByIdAsync(id, cancellationToken);
+        return Results.Ok(question);
     }
 }

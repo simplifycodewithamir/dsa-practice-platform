@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
-namespace DsaPractice.Api.Tests.Exceptions;
+namespace DsaPractice.Api.UnitTests.Exceptions;
 
 public class GlobalExceptionHandlerTests
 {

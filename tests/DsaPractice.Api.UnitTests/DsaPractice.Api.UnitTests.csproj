@@ -5,20 +5,21 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
-    <PackageReference Include="xunit" Version="2.9.*" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Moq" Version="4.20.*" />
+    <PackageReference Include="Moq" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\source\DsaPractice.Judge\DsaPractice.Judge.csproj" />
+    <ProjectReference Include="..\..\source\DsaPractice.Api\DsaPractice.Api.csproj" />
   </ItemGroup>
 
 </Project>

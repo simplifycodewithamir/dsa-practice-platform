@@ -1,9 +1,8 @@
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Http;
 
 namespace DsaPractice.Api.Exceptions;
 
-public sealed class GlobalExceptionHandler(
+internal sealed class GlobalExceptionHandler(
     IProblemDetailsService problemDetailsService,
     ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {

@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Http;
-
 namespace DsaPractice.Api.Exceptions;
 
 internal sealed class ConflictException(string detail, object? extendedDetail = null)
