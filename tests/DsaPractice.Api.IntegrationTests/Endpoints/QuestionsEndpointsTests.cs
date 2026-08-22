@@ -19,10 +19,10 @@ public class QuestionsEndpointsTests(ApiWebApplicationFactory factory)
         var question = await SeedQuestionAsync(withTestCases: false);
         using var client = factory.CreateClient();
 
-        using var response = await client.GetAsync("/api/v1/questions");
+        using var response = await client.GetAsync("/api/v1/questions", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var questions = await response.Content.ReadFromJsonAsync<List<QuestionSummaryResponse>>();
+        var questions = await response.Content.ReadFromJsonAsync<List<QuestionSummaryResponse>>(TestContext.Current.CancellationToken);
         Assert.Contains(questions!, q => q.Id == question.Id && q.Title == question.Title);
     }
 
@@ -32,10 +32,10 @@ public class QuestionsEndpointsTests(ApiWebApplicationFactory factory)
         var question = await SeedQuestionAsync(withTestCases: true);
         using var client = factory.CreateClient();
 
-        using var response = await client.GetAsync($"/api/v1/questions/{question.Id}");
+        using var response = await client.GetAsync($"/api/v1/questions/{question.Id}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var detail = await response.Content.ReadFromJsonAsync<QuestionDetailResponse>();
+        var detail = await response.Content.ReadFromJsonAsync<QuestionDetailResponse>(TestContext.Current.CancellationToken);
         Assert.Equal(question.Id, detail!.Id);
         var visibleTestCase = Assert.Single(detail.TestCases);
         Assert.Equal("2 3", visibleTestCase.Input);
@@ -46,10 +46,10 @@ public class QuestionsEndpointsTests(ApiWebApplicationFactory factory)
     {
         using var client = factory.CreateClient();
 
-        using var response = await client.GetAsync($"/api/v1/questions/{Guid.NewGuid()}");
+        using var response = await client.GetAsync($"/api/v1/questions/{Guid.NewGuid()}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        var problemDetails = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        var problemDetails = await response.Content.ReadFromJsonAsync<ProblemDetails>(TestContext.Current.CancellationToken);
         Assert.Equal("api.error.notfound", problemDetails!.Title);
     }
 

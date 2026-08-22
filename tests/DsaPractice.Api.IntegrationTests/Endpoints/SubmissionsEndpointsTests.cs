@@ -20,17 +20,17 @@ public class SubmissionsEndpointsTests(ApiWebApplicationFactory factory)
         using var client = factory.CreateClient();
         var request = new CreateSubmissionRequest(question.Id, "user-1", "csharp", "Console.WriteLine(1);");
 
-        using var response = await client.PostAsJsonAsync("/api/v1/submissions", request);
+        using var response = await client.PostAsJsonAsync("/api/v1/submissions", request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var created = await response.Content.ReadFromJsonAsync<SubmissionResponse>();
+        var created = await response.Content.ReadFromJsonAsync<SubmissionResponse>(TestContext.Current.CancellationToken);
         Assert.Equal("Pending", created!.Status);
         Assert.Equal(question.Id, created.QuestionId);
         Assert.Equal($"/api/v1/submissions/{created.Id}", response.Headers.Location!.OriginalString);
 
-        using var getResponse = await client.GetAsync(response.Headers.Location);
+        using var getResponse = await client.GetAsync(response.Headers.Location, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
-        var fetched = await getResponse.Content.ReadFromJsonAsync<SubmissionResponse>();
+        var fetched = await getResponse.Content.ReadFromJsonAsync<SubmissionResponse>(TestContext.Current.CancellationToken);
         Assert.Equal(created.Id, fetched!.Id);
     }
 
@@ -40,10 +40,10 @@ public class SubmissionsEndpointsTests(ApiWebApplicationFactory factory)
         using var client = factory.CreateClient();
         var request = new CreateSubmissionRequest(Guid.NewGuid(), "user-1", "csharp", "Console.WriteLine(1);");
 
-        using var response = await client.PostAsJsonAsync("/api/v1/submissions", request);
+        using var response = await client.PostAsJsonAsync("/api/v1/submissions", request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        var problemDetails = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        var problemDetails = await response.Content.ReadFromJsonAsync<ProblemDetails>(TestContext.Current.CancellationToken);
         Assert.Equal("api.error.notfound", problemDetails!.Title);
     }
 
@@ -54,10 +54,10 @@ public class SubmissionsEndpointsTests(ApiWebApplicationFactory factory)
         using var client = factory.CreateClient();
         var request = new CreateSubmissionRequest(question.Id, "user-1", "rust", "fn main() {}");
 
-        using var response = await client.PostAsJsonAsync("/api/v1/submissions", request);
+        using var response = await client.PostAsJsonAsync("/api/v1/submissions", request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var problemDetails = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        var problemDetails = await response.Content.ReadFromJsonAsync<ProblemDetails>(TestContext.Current.CancellationToken);
         Assert.Equal("api.error.badrequest", problemDetails!.Title);
     }
 
@@ -66,10 +66,10 @@ public class SubmissionsEndpointsTests(ApiWebApplicationFactory factory)
     {
         using var client = factory.CreateClient();
 
-        using var response = await client.GetAsync($"/api/v1/submissions/{Guid.NewGuid()}");
+        using var response = await client.GetAsync($"/api/v1/submissions/{Guid.NewGuid()}", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        var problemDetails = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        var problemDetails = await response.Content.ReadFromJsonAsync<ProblemDetails>(TestContext.Current.CancellationToken);
         Assert.Equal("api.error.notfound", problemDetails!.Title);
     }
 

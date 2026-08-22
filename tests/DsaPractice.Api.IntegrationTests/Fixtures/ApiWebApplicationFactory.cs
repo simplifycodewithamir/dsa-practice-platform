@@ -13,7 +13,7 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>, I
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
 
-    async Task IAsyncLifetime.InitializeAsync()
+    async ValueTask IAsyncLifetime.InitializeAsync()
     {
         await _postgres.StartAsync();
 
@@ -32,7 +32,7 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>, I
         });
     }
 
-    async Task IAsyncLifetime.DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();
         await _postgres.DisposeAsync();

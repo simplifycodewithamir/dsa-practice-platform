@@ -29,8 +29,11 @@ jobs:
 
       - name: Unit tests
         run: |
-          dotnet test tests/DsaPractice.Api.UnitTests/DsaPractice.Api.UnitTests.csproj --configuration Release --no-build --verbosity normal
-          dotnet test tests/DsaPractice.Judge.UnitTests/DsaPractice.Judge.UnitTests.csproj --configuration Release --no-build --verbosity normal
+          dotnet test --project tests/DsaPractice.Api.UnitTests/DsaPractice.Api.UnitTests.csproj --configuration Release --no-build --verbosity normal
+          # DsaPractice.Judge has no implementation yet, so its unit test project is deliberately
+          # empty -- MTP treats "zero tests ran" as a failure (exit 8), so allow it until real
+          # Judge tests exist. Remove --ignore-exit-code once this project has its first [Fact].
+          dotnet test --project tests/DsaPractice.Judge.UnitTests/DsaPractice.Judge.UnitTests.csproj --configuration Release --no-build --verbosity normal -- --ignore-exit-code 8
 
       - name: Integration tests
-        run: dotnet test tests/DsaPractice.Api.IntegrationTests/DsaPractice.Api.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
+        run: dotnet test --project tests/DsaPractice.Api.IntegrationTests/DsaPractice.Api.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
