@@ -1,3 +1,4 @@
+using DsaPractice.Api.Configuration;
 using DsaPractice.Api.DataAccess;
 using DsaPractice.Api.Endpoints;
 using DsaPractice.Api.Exceptions;
@@ -23,6 +24,11 @@ builder.Services.AddSingleton(TimeProvider.System);
 // its assembly scan doesn't reliably discover internal IValidator<T> implementations.
 builder.Services.AddScoped<IValidator<CreateSubmissionRequest>, CreateSubmissionRequestValidator>();
 builder.Services.AddOpenApi();
+
+builder.Services.AddOptions<SubmissionsOptions>()
+    .Bind(builder.Configuration.GetSection(SubmissionsOptions.SectionName))
+    .Validate(o => o.SupportedLanguages.Length > 0, "Submissions:SupportedLanguages must list at least one language.")
+    .ValidateOnStart();
 
 builder.Services.AddScoped<IQuestionsService, QuestionsService>();
 builder.Services.AddScoped<ISubmissionsService, SubmissionsService>();

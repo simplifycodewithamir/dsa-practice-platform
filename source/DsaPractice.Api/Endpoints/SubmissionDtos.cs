@@ -1,5 +1,7 @@
+using DsaPractice.Api.Configuration;
 using DsaPractice.Api.DataAccess.Entities;
 using FluentValidation;
+using Microsoft.Extensions.Options;
 
 namespace DsaPractice.Api.Endpoints;
 
@@ -24,16 +26,17 @@ internal sealed record SubmissionResponse(
 
 internal sealed class CreateSubmissionRequestValidator : AbstractValidator<CreateSubmissionRequest>
 {
-    // v1 scope — see dsa-practice-platform skill: C# and Python only.
-    public static readonly string[] SupportedLanguages = ["csharp", "python"];
-
-    public CreateSubmissionRequestValidator()
+    // Default set (v1 scope — see dsa-practice-platform skill: C# and Python only) lives in
+    // appsettings.json under "Submissions:SupportedLanguages", not hardcoded here.
+    public CreateSubmissionRequestValidator(IOptionsSnapshot<SubmissionsOptions> options)
     {
+        var supportedLanguages = options.Value.SupportedLanguages;
+
         RuleFor(x => x.QuestionId).NotEmpty();
         RuleFor(x => x.UserId).NotEmpty();
         RuleFor(x => x.SourceCode).NotEmpty();
         RuleFor(x => x.Language)
-            .Must(language => SupportedLanguages.Contains(language))
-            .WithMessage($"Language must be one of: {string.Join(", ", SupportedLanguages)}.");
+            .Must(language => supportedLanguages.Contains(language))
+            .WithMessage($"Language must be one of: {string.Join(", ", supportedLanguages)}.");
     }
 }
