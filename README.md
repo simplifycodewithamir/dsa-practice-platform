@@ -41,6 +41,7 @@ source-code/
 7. **Per-language `ICodeRunner`** — start with C# and Python only (v1 scope)
 8. **Seed migration** with 20-30 hand-written questions
 9. **Frontend** — not scaffolded yet; React + TypeScript + Monaco Editor for the code input
+10. **Playwright UI test suite** — once the frontend (item 9) exists, add a Playwright end-to-end test project exercising the real UI flows (browse questions → open one → submit code → see verdict). This is a permanent, CI-run suite, separate from the ad-hoc PR-demo recording tooling referenced in the `git-workflow` skill, which captures a one-off video for a PR and isn't checked into any repo here.
 
 ## Local dev
 ```bash
