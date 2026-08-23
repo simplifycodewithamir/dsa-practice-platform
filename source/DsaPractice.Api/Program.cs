@@ -17,7 +17,22 @@ builder.Services.AddDbContext<DsaPracticeDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DsaPractice")));
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
-builder.Services.AddProblemDetails();
+builder.Services.AddProblemDetails(options =>
+{
+    // UseStatusCodePages-generated responses (routing misses, wrong verb, ...) never throw, so
+    // GlobalExceptionHandler never sets a title for them -- the framework default is the plain
+    // HTTP reason phrase ("Not Found"), inconsistent with the "api.error.*" convention every
+    // thrown ApiException gets. Backfill it here, but only when nothing threw: GlobalExceptionHandler
+    // already sets the correct title itself for the exception path, and it always passes the
+    // triggering exception through, so Exception is only null for the no-throw status-code-page path.
+    options.CustomizeProblemDetails = context =>
+    {
+        if (context.Exception is null)
+        {
+            context.ProblemDetails.Title = (context.ProblemDetails.Status ?? context.HttpContext.Response.StatusCode).ToApiErrorTitle();
+        }
+    };
+});
 
 builder.Services.AddSingleton(TimeProvider.System);
 // Explicit registration, not AddValidatorsFromAssemblyContaining<Program>() --
@@ -38,6 +53,10 @@ builder.Services.AddScoped<ISubmissionsService, SubmissionsService>();
 var app = builder.Build();
 
 app.UseExceptionHandler();
+// Route framework-generated status codes (e.g. a 404 from a failed {id:guid} route
+// match, before any endpoint runs) through the same ProblemDetails body as thrown
+// ApiExceptions get, instead of leaving them as an empty response.
+app.UseStatusCodePages();
 
 if (app.Environment.IsDevelopment())
 {
