@@ -5,7 +5,9 @@ using Microsoft.Extensions.Options;
 
 namespace DsaPractice.Api.Endpoints;
 
-internal sealed record CreateSubmissionRequest(Guid QuestionId, string UserId, string Language, string SourceCode);
+// No UserId here -- it's spoofable client input. The caller's identity comes from their
+// validated JWT (the "sub" claim) instead; see SubmissionsEndpoints.CreateSubmission.
+internal sealed record CreateSubmissionRequest(Guid QuestionId, string Language, string SourceCode);
 
 internal sealed record SubmissionResponse(
     Guid Id,
@@ -33,7 +35,6 @@ internal sealed class CreateSubmissionRequestValidator : AbstractValidator<Creat
         var supportedLanguages = options.Value.SupportedLanguages;
 
         RuleFor(x => x.QuestionId).NotEmpty();
-        RuleFor(x => x.UserId).NotEmpty();
         RuleFor(x => x.SourceCode).NotEmpty();
         RuleFor(x => x.Language)
             .Must(language => supportedLanguages.Contains(language))

@@ -47,9 +47,13 @@ source-code/
    - Automated EF Core migrations in `docker compose up` via a one-shot `migrator` service — no manual `dotnet ef` step needed; `api`/`judge` moved behind an opt-in `full-stack` profile.
    - Added `.vscode/launch.json`/`tasks.json` for F5 debugging in VS Code, and fixed a pre-existing gap where Serilog had zero sinks configured (the app logged nothing to console at all).
    - Built a Playwright-based PR demo recorder, then moved it to `my-notes-and-skills/tools/pr-demo/` as a shared, repo-agnostic template.
+4. **API authorization — OAuth2 JWT bearer, policy- and filter-based** — resource-server pattern: the Api validates OAuth2-issued JWTs, it doesn't implement a full authorization server. No external IdP stood up yet for this solo project, so a `POST /api/v1/auth/dev-token` endpoint mints locally-signed tokens for testing — mapped only when `IsDevelopment()`, never in a real deployment; swapping to a real Authority (Auth0/Entra ID/Keycloak/...) later only means changing `Jwt:Issuer`/`Jwt:Audience`/signing-key validation, everything downstream is unaffected.
+   - `POST /api/v1/submissions`, `GET /api/v1/submissions/{id}` require authentication (`RequireAuthorization()` — ASP.NET Core's built-in default policy); `GET /api/v1/questions*` stays public.
+   - `CreateSubmissionRequest` no longer takes a client-supplied `userId` (a spoofable field) — the submitter's identity now comes from the validated token's `sub` claim.
+   - `GetSubmissionById` additionally enforces "must own this submission, or be Admin" via `SubmissionOwnershipFilter` (`IEndpointFilter`) — a resource-ownership rule that needs the submission loaded from the DB first, which a plain declarative policy can't express without a resource-based `IAuthorizationHandler`; the filter is the simpler fit for one endpoint.
+   - `ErrorTitles`/`ApiErrorTitlesHelper` extended for 401/403 — framework-generated auth failures (an unauthenticated or forbidden request never throws) get the same `api.error.*` ProblemDetails title convention as everything else, via the same `UseStatusCodePages`/`CustomizeProblemDetails` path used for routing-level failures.
 
 ## What's NOT built yet — pick up here
-4. Implement API authorization using latest oauth and JWT - use policy or filter based on best use case
 5. **RabbitMQ publisher in Api** (publish `SubmissionJudgeRequested` on submission create)
 6. **RabbitMQ consumer in Judge's `Worker.cs`** (currently just logs and idles)
 7. **`ISandboxExecutor`** — the actual Docker.DotNet sandboxing logic (ephemeral container per run, CPU/memory/time limits — see `dsa-practice-platform` skill's hard rules on this)
@@ -67,6 +71,10 @@ cp .env.example .env                    # one-time: local Postgres creds for doc
 dotnet user-secrets set "ConnectionStrings:DsaPractice" \
   "Host=localhost;Port=5432;Database=dsapractice;Username=dsapractice;Password=<your .env password>" \
   --project source/DsaPractice.Api
+
+# one-time: JWT signing key for local dev-token issuance (see item 4 above) -- any random
+# 32+ character string; only used to sign/validate tokens this API itself issues locally
+dotnet user-secrets set "Jwt:SigningKey" "<a random 32+ char string>" --project source/DsaPractice.Api
 
 docker compose up -d    # Postgres + RabbitMQ, and a one-shot "migrator" that applies
                          # pending EF Core migrations then exits -- no manual `dotnet ef`

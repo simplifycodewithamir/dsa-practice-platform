@@ -13,6 +13,8 @@ internal static class ApiErrorTitlesHelper
         var errorName = statusCode switch
         {
             StatusCodes.Status400BadRequest => ErrorTitles.BadRequest,
+            StatusCodes.Status401Unauthorized => ErrorTitles.Unauthorized,
+            StatusCodes.Status403Forbidden => ErrorTitles.Forbidden,
             StatusCodes.Status404NotFound => ErrorTitles.NotFound,
             StatusCodes.Status405MethodNotAllowed => ErrorTitles.MethodNotAllowed,
             StatusCodes.Status409Conflict => ErrorTitles.Conflict,

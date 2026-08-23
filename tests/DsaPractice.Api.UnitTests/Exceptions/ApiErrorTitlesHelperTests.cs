@@ -8,6 +8,8 @@ public class ApiErrorTitlesHelperTests
 {
     [Theory]
     [InlineData(StatusCodes.Status400BadRequest, ErrorTitles.BadRequest)]
+    [InlineData(StatusCodes.Status401Unauthorized, ErrorTitles.Unauthorized)]
+    [InlineData(StatusCodes.Status403Forbidden, ErrorTitles.Forbidden)]
     [InlineData(StatusCodes.Status404NotFound, ErrorTitles.NotFound)]
     [InlineData(StatusCodes.Status405MethodNotAllowed, ErrorTitles.MethodNotAllowed)]
     [InlineData(StatusCodes.Status409Conflict, ErrorTitles.Conflict)]
