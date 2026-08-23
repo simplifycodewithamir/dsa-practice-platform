@@ -29,7 +29,7 @@ builder.Services.AddProblemDetails(options =>
     {
         if (context.Exception is null)
         {
-            context.ProblemDetails.Title = ApiErrorTitles.ForStatusCode(context.ProblemDetails.Status ?? context.HttpContext.Response.StatusCode);
+            context.ProblemDetails.Title = (context.ProblemDetails.Status ?? context.HttpContext.Response.StatusCode).ToApiErrorTitle();
         }
     };
 });
