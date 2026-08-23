@@ -13,7 +13,7 @@ internal sealed class GlobalExceptionHandler(
         (string title, int httpStatusCode, string detail, object? extendedDetail) = exception switch
         {
             ApiException apiException => (apiException.Title, apiException.HttpStatusCode, apiException.Message, apiException.ExtendedDetail),
-            _ => ("api.error.unknown", StatusCodes.Status500InternalServerError, "An unexpected error occurred.", null)
+            _ => (ApiErrorTitles.Unknown, StatusCodes.Status500InternalServerError, "An unexpected error occurred.", null)
         };
 
         httpContext.Response.StatusCode = httpStatusCode;

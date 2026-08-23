@@ -53,6 +53,22 @@ public class QuestionsEndpointsTests(ApiWebApplicationFactory factory)
         Assert.Equal("api.error.notfound", problemDetails!.Title);
     }
 
+    [Fact]
+    public async Task GetQuestionById_NonGuidId_Returns404WithNotFoundTitle()
+    {
+        using var client = factory.CreateClient();
+
+        // {id:guid} fails the route constraint here -- no endpoint runs, nothing throws, so this
+        // never reaches GlobalExceptionHandler. It's UseStatusCodePages's ProblemDetails path
+        // (Program.cs) that has to produce the "api.error.notfound" title instead of the
+        // framework's default reason-phrase title ("Not Found").
+        using var response = await client.GetAsync("/api/v1/questions/not-a-guid", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var problemDetails = await response.Content.ReadFromJsonAsync<ProblemDetails>(TestContext.Current.CancellationToken);
+        Assert.Equal("api.error.notfound", problemDetails!.Title);
+    }
+
     private async Task<Question> SeedQuestionAsync(bool withTestCases)
     {
         using var scope = factory.Services.CreateScope();
