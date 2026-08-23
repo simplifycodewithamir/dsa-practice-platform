@@ -38,6 +38,10 @@ builder.Services.AddScoped<ISubmissionsService, SubmissionsService>();
 var app = builder.Build();
 
 app.UseExceptionHandler();
+// Route framework-generated status codes (e.g. a 404 from a failed {id:guid} route
+// match, before any endpoint runs) through the same ProblemDetails body as thrown
+// ApiExceptions get, instead of leaving them as an empty response.
+app.UseStatusCodePages();
 
 if (app.Environment.IsDevelopment())
 {
