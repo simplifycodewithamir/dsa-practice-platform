@@ -49,13 +49,14 @@ source-code/
    - Built a Playwright-based PR demo recorder, then moved it to `my-notes-and-skills/tools/pr-demo/` as a shared, repo-agnostic template.
 
 ## What's NOT built yet — pick up here
-4. **RabbitMQ publisher in Api** (publish `SubmissionJudgeRequested` on submission create)
-5. **RabbitMQ consumer in Judge's `Worker.cs`** (currently just logs and idles)
-6. **`ISandboxExecutor`** — the actual Docker.DotNet sandboxing logic (ephemeral container per run, CPU/memory/time limits — see `dsa-practice-platform` skill's hard rules on this)
-7. **Per-language `ICodeRunner`** — start with C# and Python only (v1 scope)
-8. **Seed migration** with 20-30 hand-written questions
-9. **Frontend** — not scaffolded yet; React + TypeScript + Monaco Editor for the code input
-10. **Playwright UI test suite** — once the frontend (item 9) exists, add a Playwright end-to-end test project exercising the real UI flows (browse questions → open one → submit code → see verdict). This is a permanent, CI-run suite, separate from the ad-hoc PR-demo recording tooling referenced in the `git-workflow` skill, which captures a one-off video for a PR and isn't checked into any repo here.
+4. Implement API authorization using latest oauth and JWT - use policy or filter based on best use case
+5. **RabbitMQ publisher in Api** (publish `SubmissionJudgeRequested` on submission create)
+6. **RabbitMQ consumer in Judge's `Worker.cs`** (currently just logs and idles)
+7. **`ISandboxExecutor`** — the actual Docker.DotNet sandboxing logic (ephemeral container per run, CPU/memory/time limits — see `dsa-practice-platform` skill's hard rules on this)
+8. **Per-language `ICodeRunner`** — start with C# and Python only (v1 scope)
+9. **Seed migration** with 20-30 hand-written questions
+10. **Frontend** — not scaffolded yet; React + TypeScript + Monaco Editor for the code input
+11. **Playwright UI test suite** — once the frontend (item 9) exists, add a Playwright end-to-end test project exercising the real UI flows (browse questions → open one → submit code → see verdict). This is a permanent, CI-run suite, separate from the ad-hoc PR-demo recording tooling referenced in the `git-workflow` skill, which captures a one-off video for a PR and isn't checked into any repo here.
 
 ## Local dev
 ```bash
