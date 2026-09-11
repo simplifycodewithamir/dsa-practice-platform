@@ -56,7 +56,7 @@ Free DSA question-practice platform, deployed for students. MVP-scoped, sequence
    - `Submission` splits lifecycle from outcome: `Status` (Pending → Running → Completed) and a nullable `Verdict` (Accepted, WrongAnswer, TimeLimitExceeded, MemoryLimitExceeded, RuntimeError, CompilationError, InternalError), set exactly when Completed.
    - Invariants enforced in Postgres, not only in C# — the seeder (item 6) and the Judge result consumer (item 10) bypass the Api's validators: slug format/uniqueness, positive limits, ordinal uniqueness, verdict-iff-completed check, and a real `Submissions → Questions` foreign key (previously missing).
    - Enums stored and serialized by name (`HasConversion<string>()`, `JsonStringEnumConverter`). `GET /api/v1/questions/{id}` replaced by `GET /api/v1/questions/{slug}` — a regex route constraint sharing the DB check's pattern.
-   - **Local DB note:** the migration requires an empty `Questions` table (a new slug/limits column has no meaningful default). If yours holds old demo rows: `docker compose down -v` (wipes local Postgres + RabbitMQ volumes), then `docker compose up -d`.
+   - **Local DB note:** the migration requires an empty `Questions` table (a new slug/limits column has no meaningful default). If yours holds old demo rows, the migrator fails with `column "Tags" of relation "Questions" contains null values` (rolled back, nothing half-applied). Either delete just those rows (`delete from "Submissions"; delete from "TestCases"; delete from "Questions";` in psql), or wipe everything local with `docker compose --profile full-stack down -v` (deletes the Postgres + RabbitMQ volumes).
 
 ## Roadmap — work top to bottom; a merged item moves up to "Already DONE"
 
@@ -163,6 +163,11 @@ dotnet run --project source/DsaPractice.Judge
 `docker compose --profile full-stack up -d --build` additionally builds and runs `api`/`judge`
 themselves in containers (`http://localhost:8080/scalar`) instead of via `dotnet run` — useful
 for testing the actual Docker images, not needed for day-to-day local dev.
+
+Tear it down with the same flag: `docker compose --profile full-stack down`. A plain
+`docker compose down` only sees services without a profile, so it leaves `api`/`judge` running
+and fails with "Network dsa-practice-platform_default — Resource is still in use". The
+`--profile` flag is harmless when those services aren't running, so it's safe to always use it.
 
 ## Run and debug in VS Code
 
