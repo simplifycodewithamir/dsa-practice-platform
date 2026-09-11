@@ -11,11 +11,11 @@ Free DSA question-practice platform for students. Personal side-project, MVP-fir
 
 ## Solution layout
 ```
-DsaPractice.sln
 source/
+  DsaPractice.slnx
   DsaPractice.Api/                  # Minimal API — Questions, Submissions (metadata only, never executes code)
-  DsaPractice.Api.DataAccess/       # EF Core, Postgres
-  DsaPractice.Api.DataMigrations/   # migrations, split per convention
+  DsaPractice.DataAccess/           # EF Core, Postgres
+  DataMigrations/DsaPractice.DataMigrations.Postgres/   # migrations + the `migrator` image
   DsaPractice.Judge/                # Worker service — sandboxed code execution
   DsaPractice.Contracts/            # shared RabbitMQ message DTOs
 tests/
@@ -46,13 +46,13 @@ against either project supplies both. docker-compose reads Postgres creds from a
 
 ## Build & test
 ```bash
-dotnet restore DsaPractice.sln
-dotnet build DsaPractice.sln
-dotnet test DsaPractice.sln
+dotnet restore source/DsaPractice.slnx
+dotnet build source/DsaPractice.slnx
+dotnet test --solution source/DsaPractice.slnx   # MTP mode (global.json) needs --solution; integration tests need Docker running
 ```
 
 ## Conventions
 This project follows the general-purpose skills in `~/.claude/skills/` — `dotnet-production-code`, `dotnet-testing`, `react-frontend`, `git-workflow` — for everything not specific to this repo. The one deviation: day-1 CI here is a single lightweight GitHub Actions workflow (restore → build → test → CodeQL → Docker image), not the full Artifactory/Argo CD/k8s-deploy pattern from `cicd-pipeline` — this is a solo project, revisit that pattern only if it needs real prod-grade rollout later.
 
 ## Current status
-Skeleton scaffolded — solution, all csproj files, entity/contract skeletons, Program.cs stubs with TODOs, day-1 CI, docker-compose for local dev. See README.md for the numbered "what's not built yet" list.
+Questions/Submissions endpoints, ProblemDetails error handling, migrations and day-1 CI are done. README.md holds the phased roadmap (one item per PR, in order) and the key decisions D1–D11 behind it — check both before starting any feature.

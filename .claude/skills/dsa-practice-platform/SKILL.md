@@ -15,8 +15,8 @@ Personal side-project, MVP-first. Defers the full enterprise CI/CD pattern (see 
 
 ## MVP scope (v1) — don't build past this without discussing
 - 1–2 supported languages only (C# and Python to start)
-- 20–30 hand-curated questions, seeded via migration, not an admin UI yet
-- Pass/fail against test cases only — no runtime/memory complexity scoring yet
+- 20–30 hand-curated questions as content-as-code (`content/questions/<slug>/`), upserted idempotently by the `migrator` — not EF data migrations, not an admin UI yet (README decision D9)
+- Pass/fail against stdin/stdout test cases only (D8) — no runtime/memory complexity scoring yet
 - No leaderboard, no user progress tracking yet — those are v2+
 
 ## Judge execution — hard rules
@@ -24,6 +24,10 @@ Personal side-project, MVP-first. Defers the full enterprise CI/CD pattern (see 
 - Every sandbox run gets a hard CPU/memory/wall-clock limit (propose exact values per language runner — flag for review, don't hardcode silently).
 - Sandbox containers are torn down immediately after each run — never reused across submissions.
 - Judge → Api result delivery is async via RabbitMQ, never a synchronous HTTP callback.
+- The Judge never reads the Api's database — `SubmissionJudgeRequested` carries code, language, test cases and limits (D7).
+
+## Roadmap
+The sequenced plan and the key decisions behind it (D1–D11: hosting, auth, messaging, frontend) live in README.md. Build one item per PR, in order — don't pull later items forward.
 
 ## CI/CD deviation from `cicd-pipeline` (flagged explicitly, per convention)
 This is a solo side-project — the full self-hosted Artifactory + separate `k8s-deploy` GitOps + Argo CD pattern is deferred until/unless this gets real usage. Day-1 CI here is a single GitHub Actions workflow per repo: restore → build → test → CodeQL → build Docker image. No deploy-repo split yet. Revisit and adopt the full `cicd-pipeline` pattern if this ever needs prod-grade rollout.
