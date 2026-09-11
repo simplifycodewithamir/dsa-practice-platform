@@ -12,7 +12,8 @@ internal sealed record SubmissionResponse(
     Guid QuestionId,
     string UserId,
     string Language,
-    string Status,
+    SubmissionStatus Status,
+    SubmissionVerdict? Verdict,
     DateTimeOffset SubmittedAtUtc)
 {
     public static SubmissionResponse FromEntity(Submission submission) => new(
@@ -21,6 +22,7 @@ internal sealed record SubmissionResponse(
         submission.UserId,
         submission.Language,
         submission.Status,
+        submission.Verdict,
         submission.SubmittedAtUtc);
 }
 

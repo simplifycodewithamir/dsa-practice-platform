@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using DsaPractice.Api.Configuration;
 using DsaPractice.Api.DataAccess;
 using DsaPractice.Api.Endpoints;
@@ -33,6 +34,11 @@ builder.Services.AddProblemDetails(options =>
         }
     };
 });
+
+// Enums go over the wire by name ("Medium", "WrongAnswer"), not ordinal -- readable for clients,
+// and reordering enum members can't silently change what an existing value means.
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddSingleton(TimeProvider.System);
 // Explicit registration, not AddValidatorsFromAssemblyContaining<Program>() --
