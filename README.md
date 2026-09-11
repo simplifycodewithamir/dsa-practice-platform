@@ -4,23 +4,25 @@ Free DSA question-practice platform, deployed for students. MVP-scoped, sequence
 
 ## Structure
 ```
-source-code/
+.
 ├── CLAUDE.md                             # always-on project context
 ├── .claude/skills/dsa-practice-platform/SKILL.md   # Judge/sandbox architecture, loads on-demand
-├── DsaPractice.sln
+├── Directory.Packages.props              # NuGet Central Package Management
 ├── source/
+│   ├── DsaPractice.slnx
 │   ├── DsaPractice.Api/                  # Minimal API — Questions, Submissions (metadata only)
-│   ├── DsaPractice.Api.DataAccess/       # EF Core, Postgres
-│   ├── DsaPractice.Api.DataMigrations/   # migrations, split per convention
+│   ├── DsaPractice.DataAccess/           # EF Core DbContext + entities, Postgres
+│   ├── DataMigrations/DsaPractice.DataMigrations.Postgres/   # migrations + the `migrator` image
 │   ├── DsaPractice.Judge/                # Worker service — sandboxed code execution
 │   └── DsaPractice.Contracts/            # shared RabbitMQ message DTOs
 ├── tests/
 │   ├── DsaPractice.Api.UnitTests/
 │   ├── DsaPractice.Api.IntegrationTests/
 │   └── DsaPractice.Judge.UnitTests/
+├── docs/                                 # learning notes (e.g. dsa-containers-design.md)
 ├── frontend/                             # React + TypeScript (not yet scaffolded)
-├── .github/workflows/ci.yml
-└── docker-compose.yml                    # Postgres + RabbitMQ + both services, local dev
+├── .github/workflows/dotnet.yml
+└── docker-compose.yml                    # Postgres + RabbitMQ + migrator (+ api/judge under `full-stack`)
 ```
 
 ## What's already scaffolded
