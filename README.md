@@ -12,13 +12,17 @@ Free DSA question-practice platform, deployed for students. MVP-scoped, sequence
 │   ├── DsaPractice.slnx
 │   ├── DsaPractice.Api/                  # Minimal API — Questions, Submissions (metadata only)
 │   ├── DsaPractice.DataAccess/           # EF Core DbContext + entities, Postgres
-│   ├── DataMigrations/DsaPractice.DataMigrations.Postgres/   # migrations + the `migrator` image
+│   ├── DsaPractice.ContentSeeding/       # reads content/questions/** and upserts it by slug
+│   ├── DataMigrations/DsaPractice.DataMigrations.Postgres/   # migrations + the `migrator` app/image
 │   ├── DsaPractice.Judge/                # Worker service — sandboxed code execution
 │   └── DsaPractice.Contracts/            # shared RabbitMQ message DTOs
 ├── tests/
 │   ├── DsaPractice.Api.UnitTests/
 │   ├── DsaPractice.Api.IntegrationTests/
+│   ├── DsaPractice.ContentSeeding.UnitTests/
+│   ├── DsaPractice.ContentSeeding.IntegrationTests/
 │   └── DsaPractice.Judge.UnitTests/
+├── content/questions/<slug>/             # authored questions — see "Authoring a question"
 ├── docs/                                 # learning notes (e.g. dsa-containers-design.md)
 ├── frontend/                             # React + TypeScript (not yet scaffolded)
 ├── .github/workflows/dotnet.yml
@@ -56,7 +60,12 @@ Free DSA question-practice platform, deployed for students. MVP-scoped, sequence
    - `Submission` splits lifecycle from outcome: `Status` (Pending → Running → Completed) and a nullable `Verdict` (Accepted, WrongAnswer, TimeLimitExceeded, MemoryLimitExceeded, RuntimeError, CompilationError, InternalError), set exactly when Completed.
    - Invariants enforced in Postgres, not only in C# — the seeder (item 6) and the Judge result consumer (item 10) bypass the Api's validators: slug format/uniqueness, positive limits, ordinal uniqueness, verdict-iff-completed check, and a real `Submissions → Questions` foreign key (previously missing).
    - Enums stored and serialized by name (`HasConversion<string>()`, `JsonStringEnumConverter`). `GET /api/v1/questions/{id}` replaced by `GET /api/v1/questions/{slug}` — a regex route constraint sharing the DB check's pattern.
-   - **Local DB note:** the migration requires an empty `Questions` table (a new slug/limits column has no meaningful default). If yours holds old demo rows, the migrator fails with `column "Tags" of relation "Questions" contains null values` (rolled back, nothing half-applied). Either delete just those rows (`delete from "Submissions"; delete from "TestCases"; delete from "Questions";` in psql), or wipe everything local with `docker compose --profile full-stack down -v` (deletes the Postgres + RabbitMQ volumes).
+6. **Content seeder + first 3 questions** (D9) — questions live in `content/questions/<slug>/` and are upserted by slug (see "Authoring a question" below). Two Sum, Valid Parentheses and Maximum Subarray Sum are seeded, each with samples, hidden tests and a reference solution.
+   - `DsaPractice.ContentSeeding` — `ContentLoader` (reads and validates the tree, reporting every broken question in one message) and `QuestionSeeder` (the upsert).
+   - **Idempotent:** re-running against unchanged content writes nothing. Edits update in place, keeping question and test-case ids, because submissions and their per-test results point at them. A question in the database but absent from content is left alone, never deleted.
+   - Ordinals are assigned by the loader (samples first, then hidden), so authors never hand-number test cases across two folders and collide on the unique index.
+   - **The `migrator` is now a small console app** rather than a `dotnet ef database update` invocation: it applies migrations, then seeds, in one transaction-safe shot. Its image dropped from the SDK to the runtime, and no design-time tooling ships to a deployment. `dotnet ef migrations add` on the host is unchanged.
+   - **Local DB note:** the item 5 migration requires an empty `Questions` table (a new slug/limits column has no meaningful default). If yours holds old demo rows, the migrator fails with `column "Tags" of relation "Questions" contains null values` (rolled back, nothing half-applied). Either delete just those rows (`delete from "Submissions"; delete from "TestCases"; delete from "Questions";` in psql), or wipe everything local with `docker compose --profile full-stack down -v` (deletes the Postgres + RabbitMQ volumes).
 
 ## Roadmap — work top to bottom; a merged item moves up to "Already DONE"
 
@@ -86,8 +95,6 @@ Not final — revisit any row whose *why* stops holding.
 ### Phase 1 — Core judging loop (local, backend only)
 The heart of the product. Submissions keep a client-supplied `userId` until Phase 3 — acceptable only because nothing is deployed yet.
 
-6. **Content seeder + first 3 questions** (D9) — `content/questions/<slug>/` (metadata YAML, `statement.md`, `tests/*.in` / `*.out`), upserted idempotently by the `migrator`.
-   *Learn:* idempotency, content-as-code, why schema changes and data changes are different pipelines.
 7. **Publish `SubmissionJudgeRequested`** (D5, D7) — declare exchange/queue topology, publisher confirms; contract gains test cases and limits. Deliberately naive "save, then publish".
    *Learn:* the AMQP model (exchange, queue, binding, routing key), durability, publisher confirms.
 8. **Transactional outbox** (D6) — close item 7's dual-write gap: the outbox row is written in the same DB transaction as the submission; a `BackgroundService` relays it to RabbitMQ.
@@ -151,11 +158,11 @@ dotnet user-secrets set "ConnectionStrings:DsaPractice" \
   "Host=localhost;Port=5432;Database=dsapractice;Username=dsapractice;Password=<your .env password>" \
   --project source/DsaPractice.Api
 
-docker compose up -d    # Postgres + RabbitMQ, and a one-shot "migrator" that applies
-                         # pending EF Core migrations then exits -- no manual `dotnet ef`
-                         # step needed. Re-run `docker compose run --rm migrator` any time
-                         # you just want the schema brought up to date on its own (e.g.
-                         # after pulling a new migration).
+docker compose up -d    # Postgres + RabbitMQ, and a one-shot "migrator" that applies pending
+                         # EF Core migrations, seeds content/questions/**, then exits -- no
+                         # manual `dotnet ef` step needed. Re-run `docker compose run --rm
+                         # migrator` after pulling a new migration or editing content; both
+                         # halves are idempotent, so re-running costs nothing.
 dotnet run --project source/DsaPractice.Api
 dotnet run --project source/DsaPractice.Judge
 ```
@@ -168,6 +175,39 @@ Tear it down with the same flag: `docker compose --profile full-stack down`. A p
 `docker compose down` only sees services without a profile, so it leaves `api`/`judge` running
 and fails with "Network dsa-practice-platform_default — Resource is still in use". The
 `--profile` flag is harmless when those services aren't running, so it's safe to always use it.
+
+## Authoring a question
+
+Questions are content, not code or data migrations (decision D9). One folder per question, named
+with the slug that becomes its URL (`/problems/two-sum`):
+
+```
+content/questions/two-sum/
+├── question.json            # title, difficulty (Easy|Medium|Hard), tags, timeLimitMs, memoryLimitMb
+├── statement.md             # markdown problem statement
+├── tests/
+│   ├── sample/01.in 01.out  # shown to the user via GET /api/v1/questions/{slug}
+│   └── hidden/01.in 01.out  # judged against, never returned by the Api
+└── solutions/reference.py   # ignored by the seeder; a known-good solution to check tests against
+```
+
+Then apply it:
+
+```bash
+docker compose run --rm migrator          # upserts by slug; unchanged content writes nothing
+```
+
+Notes:
+- **Ordinals are assigned by the loader** — samples first, then hidden, each in filename order. Don't
+  number across the two folders yourself.
+- **Every `.in` needs a matching `.out`**, and every question needs at least one sample. Broken content
+  fails the run with every problem listed at once, before anything is written.
+- **Editing is safe**: questions and test cases are matched by slug and ordinal and updated in place, so
+  ids survive and existing submissions keep pointing at the right rows. Deleting a folder does *not*
+  delete the question — remove it deliberately in SQL if you really mean to.
+- Test case files are normalised (CRLF → LF, trailing newline trimmed) so a Windows checkout feeds the
+  sandbox exactly what a Linux one does.
+- Keep expected outputs honest: run `solutions/reference.py` against every `.in` before committing.
 
 ## Run and debug in VS Code
 
