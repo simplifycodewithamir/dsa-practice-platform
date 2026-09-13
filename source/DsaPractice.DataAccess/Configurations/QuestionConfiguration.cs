@@ -1,8 +1,8 @@
-using DsaPractice.Api.DataAccess.Entities;
+using DsaPractice.DataAccess.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace DsaPractice.Api.DataAccess.Configurations;
+namespace DsaPractice.DataAccess.Configurations;
 
 internal sealed class QuestionConfiguration : IEntityTypeConfiguration<Question>
 {

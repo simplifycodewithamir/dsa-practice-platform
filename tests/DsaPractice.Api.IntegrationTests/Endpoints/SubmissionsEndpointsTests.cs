@@ -1,6 +1,7 @@
+using DsaPractice.DataAccess.Enums;
 using System.Net;
 using System.Net.Http.Json;
-using DsaPractice.Api.DataAccess.Entities;
+using DsaPractice.DataAccess.Entities;
 using DsaPractice.Api.Endpoints;
 using DsaPractice.Api.IntegrationTests.Fixtures;
 using Microsoft.AspNetCore.Mvc;

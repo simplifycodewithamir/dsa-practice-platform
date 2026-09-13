@@ -1,8 +1,9 @@
-using DsaPractice.Api.DataAccess.Entities;
+using DsaPractice.DataAccess.Enums;
+using DsaPractice.DataAccess.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace DsaPractice.Api.DataAccess.Configurations;
+namespace DsaPractice.DataAccess.Configurations;
 
 internal sealed class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
 {

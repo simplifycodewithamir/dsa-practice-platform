@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 using DsaPractice.Api.Configuration;
-using DsaPractice.Api.DataAccess;
+using DsaPractice.DataAccess;
 using DsaPractice.Api.Endpoints;
 using DsaPractice.Api.Exceptions;
 using DsaPractice.Api.Services;

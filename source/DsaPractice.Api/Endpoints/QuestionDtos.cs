@@ -1,4 +1,5 @@
-using DsaPractice.Api.DataAccess.Entities;
+using DsaPractice.DataAccess.Enums;
+using DsaPractice.DataAccess.Entities;
 
 namespace DsaPractice.Api.Endpoints;
 
