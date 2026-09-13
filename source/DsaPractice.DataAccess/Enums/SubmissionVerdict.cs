@@ -1,4 +1,4 @@
-namespace DsaPractice.Api.DataAccess.Entities;
+namespace DsaPractice.DataAccess.Enums;
 
 /// <summary>Outcome of a completed submission -- the first failing test case decides it.</summary>
 public enum SubmissionVerdict

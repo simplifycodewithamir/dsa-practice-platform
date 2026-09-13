@@ -1,5 +1,6 @@
-using DsaPractice.Api.DataAccess;
-using DsaPractice.Api.DataAccess.Entities;
+using DsaPractice.DataAccess.Enums;
+using DsaPractice.DataAccess;
+using DsaPractice.DataAccess.Entities;
 using DsaPractice.Api.Endpoints;
 using DsaPractice.Api.Exceptions;
 using Microsoft.EntityFrameworkCore;

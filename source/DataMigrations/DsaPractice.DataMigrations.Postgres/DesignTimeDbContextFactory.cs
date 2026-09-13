@@ -1,4 +1,4 @@
-using DsaPractice.Api.DataAccess;
+using DsaPractice.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;

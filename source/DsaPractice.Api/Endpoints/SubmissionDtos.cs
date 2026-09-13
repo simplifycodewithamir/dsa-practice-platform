@@ -1,5 +1,6 @@
+using DsaPractice.DataAccess.Enums;
 using DsaPractice.Api.Configuration;
-using DsaPractice.Api.DataAccess.Entities;
+using DsaPractice.DataAccess.Entities;
 using FluentValidation;
 using Microsoft.Extensions.Options;
 

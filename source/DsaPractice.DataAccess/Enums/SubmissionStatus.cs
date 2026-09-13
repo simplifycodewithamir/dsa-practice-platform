@@ -1,4 +1,4 @@
-namespace DsaPractice.Api.DataAccess.Entities;
+namespace DsaPractice.DataAccess.Enums;
 
 /// <summary>
 /// Where a submission is in its lifecycle -- deliberately separate from <see cref="SubmissionVerdict"/>

@@ -1,4 +1,4 @@
-using DsaPractice.Api.DataAccess;
+using DsaPractice.DataAccess;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;

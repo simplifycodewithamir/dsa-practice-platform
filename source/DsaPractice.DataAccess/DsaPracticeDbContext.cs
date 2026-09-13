@@ -1,7 +1,7 @@
-using DsaPractice.Api.DataAccess.Entities;
+using DsaPractice.DataAccess.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace DsaPractice.Api.DataAccess;
+namespace DsaPractice.DataAccess;
 
 public sealed class DsaPracticeDbContext(DbContextOptions<DsaPracticeDbContext> options)
     : DbContext(options)

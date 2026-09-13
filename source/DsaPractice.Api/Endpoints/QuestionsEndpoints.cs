@@ -1,5 +1,6 @@
-using DsaPractice.Api.DataAccess.Entities;
 using DsaPractice.Api.Services;
+using DsaPractice.DataAccess.Entities;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace DsaPractice.Api.Endpoints;
 
@@ -13,20 +14,23 @@ internal static class QuestionsEndpoints
     public static RouteGroupBuilder MapQuestionsEndpoints(this RouteGroupBuilder group)
     {
         group.MapGet("/", GetQuestions);
-        group.MapGet($"/{SlugRouteParameter}", GetQuestionBySlug);
+        // A slug that fails the route constraint 404s before this handler runs, so the
+        // not-found response has two sources -- both ProblemDetails, neither inferable.
+        group.MapGet($"/{SlugRouteParameter}", GetQuestionBySlug)
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         return group;
     }
 
-    private static async Task<IResult> GetQuestions(IQuestionsService questionsService, CancellationToken cancellationToken)
+    private static async Task<Ok<IReadOnlyList<QuestionSummaryResponse>>> GetQuestions(IQuestionsService questionsService, CancellationToken cancellationToken)
     {
         var questions = await questionsService.GetQuestionsAsync(cancellationToken);
-        return Results.Ok(questions);
+        return TypedResults.Ok(questions);
     }
 
-    private static async Task<IResult> GetQuestionBySlug(string slug, IQuestionsService questionsService, CancellationToken cancellationToken)
+    private static async Task<Ok<QuestionDetailResponse>> GetQuestionBySlug(string slug, IQuestionsService questionsService, CancellationToken cancellationToken)
     {
         var question = await questionsService.GetQuestionBySlugAsync(slug, cancellationToken);
-        return Results.Ok(question);
+        return TypedResults.Ok(question);
     }
 }

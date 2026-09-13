@@ -1,4 +1,6 @@
-namespace DsaPractice.Api.DataAccess.Entities;
+using DsaPractice.DataAccess.Enums;
+
+namespace DsaPractice.DataAccess.Entities;
 
 public sealed class Question
 {
