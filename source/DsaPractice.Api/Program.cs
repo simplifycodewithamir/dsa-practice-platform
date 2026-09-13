@@ -75,7 +75,7 @@ app.UseHttpsRedirection();
 app.MapGroup("/api/v1/questions").MapQuestionsEndpoints();
 app.MapGroup("/api/v1/submissions").MapSubmissionsEndpoints();
 
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/health", () => TypedResults.Ok(new HealthResponse("ok")));
 
 app.Run();
 

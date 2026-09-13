@@ -1,6 +1,7 @@
 using DsaPractice.Api.Exceptions;
 using DsaPractice.Api.Services;
 using FluentValidation;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace DsaPractice.Api.Endpoints;
 
@@ -8,13 +9,19 @@ internal static class SubmissionsEndpoints
 {
     public static RouteGroupBuilder MapSubmissionsEndpoints(this RouteGroupBuilder group)
     {
-        group.MapPost("/", CreateSubmission);
-        group.MapGet("/{id:guid}", GetSubmissionById);
+        // The handlers' return types document the success responses; the failures are thrown as
+        // ApiExceptions and turned into ProblemDetails by GlobalExceptionHandler, which the
+        // OpenAPI document can't infer -- hence the explicit ProducesProblem calls.
+        group.MapPost("/", CreateSubmission)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+        group.MapGet("/{id:guid}", GetSubmissionById)
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         return group;
     }
 
-    private static async Task<IResult> CreateSubmission(
+    private static async Task<Created<SubmissionResponse>> CreateSubmission(
         CreateSubmissionRequest request,
         IValidator<CreateSubmissionRequest> validator,
         ISubmissionsService submissionsService,
@@ -30,12 +37,12 @@ internal static class SubmissionsEndpoints
 
         var response = await submissionsService.CreateSubmissionAsync(request, cancellationToken);
 
-        return Results.Created($"/api/v1/submissions/{response.Id}", response);
+        return TypedResults.Created($"/api/v1/submissions/{response.Id}", response);
     }
 
-    private static async Task<IResult> GetSubmissionById(Guid id, ISubmissionsService submissionsService, CancellationToken cancellationToken)
+    private static async Task<Ok<SubmissionResponse>> GetSubmissionById(Guid id, ISubmissionsService submissionsService, CancellationToken cancellationToken)
     {
         var response = await submissionsService.GetSubmissionByIdAsync(id, cancellationToken);
-        return Results.Ok(response);
+        return TypedResults.Ok(response);
     }
 }
