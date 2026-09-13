@@ -51,6 +51,12 @@ Free DSA question-practice platform, deployed for students. MVP-scoped, sequence
    - Built a Playwright-based PR demo recorder, then moved it to `my-notes-and-skills/tools/pr-demo/` as a shared, repo-agnostic template.
 
 4. ~~**API authorization** (PR #8)~~ — **closed, not merged; superseded by D3/D4 below.** Its sound parts (`RequireAuthorization()`, identity from the token instead of a spoofable request field, the owner-or-Admin `SubmissionOwnershipFilter`, 401/403 ProblemDetails) come back in item 19 on top of a real `Users` table. Its custom HS256 token service and dev-token endpoint don't — they'd be deleted the day a real IdP arrives, and `Submission.UserId` storing the raw IdP `sub` would tie every submission to one IdP forever.
+5. **Question model for real content** — the schema item 6's content files will fill:
+   - `Question` gains `Slug` (unique, lowercase kebab-case), `Difficulty` as an enum, `Tags` (native Postgres `text[]`), per-question limits (`TimeLimitMs` per test case, `MemoryLimitMb`); `Description` holds the markdown statement. `TestCase` gains `Ordinal` (unique per question) — visible test cases are the samples.
+   - `Submission` splits lifecycle from outcome: `Status` (Pending → Running → Completed) and a nullable `Verdict` (Accepted, WrongAnswer, TimeLimitExceeded, MemoryLimitExceeded, RuntimeError, CompilationError, InternalError), set exactly when Completed.
+   - Invariants enforced in Postgres, not only in C# — the seeder (item 6) and the Judge result consumer (item 10) bypass the Api's validators: slug format/uniqueness, positive limits, ordinal uniqueness, verdict-iff-completed check, and a real `Submissions → Questions` foreign key (previously missing).
+   - Enums stored and serialized by name (`HasConversion<string>()`, `JsonStringEnumConverter`). `GET /api/v1/questions/{id}` replaced by `GET /api/v1/questions/{slug}` — a regex route constraint sharing the DB check's pattern.
+   - **Local DB note:** the migration requires an empty `Questions` table (a new slug/limits column has no meaningful default). If yours holds old demo rows, the migrator fails with `column "Tags" of relation "Questions" contains null values` (rolled back, nothing half-applied). Either delete just those rows (`delete from "Submissions"; delete from "TestCases"; delete from "Questions";` in psql), or wipe everything local with `docker compose --profile full-stack down -v` (deletes the Postgres + RabbitMQ volumes).
 
 ## Roadmap — work top to bottom; a merged item moves up to "Already DONE"
 
@@ -80,8 +86,6 @@ Not final — revisit any row whose *why* stops holding.
 ### Phase 1 — Core judging loop (local, backend only)
 The heart of the product. Submissions keep a client-supplied `userId` until Phase 3 — acceptable only because nothing is deployed yet.
 
-5. **Question model for real content** — `Slug` (URL key), `Difficulty` as an enum, tags, markdown statement, per-question time/memory limits, sample vs hidden test cases; `Submission.Status` becomes a real verdict set (Accepted, WrongAnswer, TimeLimitExceeded, MemoryLimitExceeded, RuntimeError, CompilationError, InternalError); `GET /questions/{slug}`.
-   *Learn:* EF Core value conversions, enum persistence, evolving an API contract.
 6. **Content seeder + first 3 questions** (D9) — `content/questions/<slug>/` (metadata YAML, `statement.md`, `tests/*.in` / `*.out`), upserted idempotently by the `migrator`.
    *Learn:* idempotency, content-as-code, why schema changes and data changes are different pipelines.
 7. **Publish `SubmissionJudgeRequested`** (D5, D7) — declare exchange/queue topology, publisher confirms; contract gains test cases and limits. Deliberately naive "save, then publish".
@@ -159,6 +163,11 @@ dotnet run --project source/DsaPractice.Judge
 `docker compose --profile full-stack up -d --build` additionally builds and runs `api`/`judge`
 themselves in containers (`http://localhost:8080/scalar`) instead of via `dotnet run` — useful
 for testing the actual Docker images, not needed for day-to-day local dev.
+
+Tear it down with the same flag: `docker compose --profile full-stack down`. A plain
+`docker compose down` only sees services without a profile, so it leaves `api`/`judge` running
+and fails with "Network dsa-practice-platform_default — Resource is still in use". The
+`--profile` flag is harmless when those services aren't running, so it's safe to always use it.
 
 ## Run and debug in VS Code
 

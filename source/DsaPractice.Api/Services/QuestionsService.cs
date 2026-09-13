@@ -9,7 +9,7 @@ internal interface IQuestionsService
 {
     Task<IReadOnlyList<QuestionSummaryResponse>> GetQuestionsAsync(CancellationToken cancellationToken);
 
-    Task<QuestionDetailResponse> GetQuestionByIdAsync(Guid id, CancellationToken cancellationToken);
+    Task<QuestionDetailResponse> GetQuestionBySlugAsync(string slug, CancellationToken cancellationToken);
 }
 
 internal sealed class QuestionsService(DsaPracticeDbContext db) : IQuestionsService
@@ -19,18 +19,19 @@ internal sealed class QuestionsService(DsaPracticeDbContext db) : IQuestionsServ
         return await db.Questions
             .AsNoTracking()
             .OrderBy(q => q.Title)
-            .Select(q => new QuestionSummaryResponse(q.Id, q.Title, q.Difficulty))
+            .Select(q => new QuestionSummaryResponse(q.Id, q.Slug, q.Title, q.Difficulty, q.Tags))
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<QuestionDetailResponse> GetQuestionByIdAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<QuestionDetailResponse> GetQuestionBySlugAsync(string slug, CancellationToken cancellationToken)
     {
-        // Business rule: never surface hidden test cases through this read path.
+        // Business rule: never surface hidden test cases through this read path -- only the
+        // samples, in the order they're presented and run.
         var question = await db.Questions
             .AsNoTracking()
-            .Include(q => q.TestCases.Where(tc => !tc.IsHidden))
-            .FirstOrDefaultAsync(q => q.Id == id, cancellationToken)
-            ?? throw new NotFoundException($"Question '{id}' was not found.");
+            .Include(q => q.TestCases.Where(tc => !tc.IsHidden).OrderBy(tc => tc.Ordinal))
+            .FirstOrDefaultAsync(q => q.Slug == slug, cancellationToken)
+            ?? throw new NotFoundException($"Question '{slug}' was not found.");
 
         return QuestionDetailResponse.FromEntity(question);
     }

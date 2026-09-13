@@ -12,7 +12,8 @@ public sealed class DsaPracticeDbContext(DbContextOptions<DsaPracticeDbContext> 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // TODO: entity configurations (either fluent here or separate IEntityTypeConfiguration<T> classes)
         base.OnModelCreating(modelBuilder);
+        // One IEntityTypeConfiguration<T> per entity under Configurations/.
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(DsaPracticeDbContext).Assembly);
     }
 }

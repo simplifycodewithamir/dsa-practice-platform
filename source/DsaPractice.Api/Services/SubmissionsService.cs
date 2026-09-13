@@ -34,7 +34,7 @@ internal sealed class SubmissionsService(DsaPracticeDbContext db, TimeProvider t
             UserId = request.UserId,
             Language = request.Language,
             SourceCode = request.SourceCode,
-            Status = "Pending",
+            Status = SubmissionStatus.Pending,
             SubmittedAtUtc = timeProvider.GetUtcNow()
         };
 
