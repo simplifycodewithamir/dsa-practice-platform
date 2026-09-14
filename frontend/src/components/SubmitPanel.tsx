@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { useCreateSubmission, useSubmission } from '../api/queries';
-import { getSubmitterId } from '../lib/submitter';
 import VerdictPanel from './VerdictPanel';
 
 /** Matches Submissions:SupportedLanguages on the Api; both are v1 scope. */
@@ -61,12 +60,9 @@ export default function SubmitPanel({ questionId }: { questionId: string }) {
           type="button"
           disabled={busy || sourceCode.trim().length === 0}
           onClick={() =>
-            createSubmission.mutate({
-              questionId,
-              userId: getSubmitterId(),
-              language: language.id,
-              sourceCode,
-            })
+            // No user id: who is submitting is the Api's decision, from the caller's identity
+            // (item 19). Item 20 adds signing in and a token on this request.
+            createSubmission.mutate({ questionId, language: language.id, sourceCode })
           }
           className="rounded-md bg-slate-900 px-4 py-2 font-medium text-white disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"
         >

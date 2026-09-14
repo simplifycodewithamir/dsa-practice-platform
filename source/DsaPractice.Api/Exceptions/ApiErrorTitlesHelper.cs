@@ -13,6 +13,10 @@ internal static class ApiErrorTitlesHelper
         var errorName = statusCode switch
         {
             StatusCodes.Status400BadRequest => ErrorTitles.BadRequest,
+            // 401 and 403 are produced by the framework without anything throwing, so they reach
+            // the client through UseStatusCodePages rather than the exception handler.
+            StatusCodes.Status401Unauthorized => ErrorTitles.Unauthorized,
+            StatusCodes.Status403Forbidden => ErrorTitles.Forbidden,
             StatusCodes.Status404NotFound => ErrorTitles.NotFound,
             StatusCodes.Status405MethodNotAllowed => ErrorTitles.MethodNotAllowed,
             StatusCodes.Status409Conflict => ErrorTitles.Conflict,
