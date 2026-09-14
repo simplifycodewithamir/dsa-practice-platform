@@ -60,6 +60,7 @@ Free DSA question-practice platform, deployed for students. MVP-scoped, sequence
    - `Submission` splits lifecycle from outcome: `Status` (Pending → Running → Completed) and a nullable `Verdict` (Accepted, WrongAnswer, TimeLimitExceeded, MemoryLimitExceeded, RuntimeError, CompilationError, InternalError), set exactly when Completed.
    - Invariants enforced in Postgres, not only in C# — the seeder (item 6) and the Judge result consumer (item 10) bypass the Api's validators: slug format/uniqueness, positive limits, ordinal uniqueness, verdict-iff-completed check, and a real `Submissions → Questions` foreign key (previously missing).
    - Enums stored and serialized by name (`HasConversion<string>()`, `JsonStringEnumConverter`). `GET /api/v1/questions/{id}` replaced by `GET /api/v1/questions/{slug}` — a regex route constraint sharing the DB check's pattern.
+   - **Local DB note:** this migration requires an empty `Questions` table (a new slug/limits column has no meaningful default). If yours holds old demo rows, the migrator fails with `column "Tags" of relation "Questions" contains null values` (rolled back, nothing half-applied). Either delete just those rows (`delete from "Submissions"; delete from "TestCases"; delete from "Questions";` in psql), or wipe everything local with `docker compose --profile full-stack down -v` (deletes the Postgres + RabbitMQ volumes).
 6. **Content seeder + first 3 questions** (D9) — questions live in `content/questions/<slug>/` and are upserted by slug (see "Authoring a question" below). Two Sum, Valid Parentheses and Maximum Subarray Sum are seeded, each with samples, hidden tests and a reference solution.
    - `DsaPractice.ContentSeeding` — `ContentLoader` (reads and validates the tree, reporting every broken question in one message) and `QuestionSeeder` (the upsert).
    - **Idempotent:** re-running against unchanged content writes nothing. Edits update in place, keeping question and test-case ids, because submissions and their per-test results point at them. A question in the database but absent from content is left alone, never deleted.
@@ -70,9 +71,14 @@ Free DSA question-practice platform, deployed for students. MVP-scoped, sequence
    - **Self-contained message** (D7): code, language, per-question limits, and *every* test case including hidden ones — the Judge never reads the Api's database. Hiding test cases is a read-API rule, not a judging one.
    - **Publisher confirms** (`CreateChannelOptions(publisherConfirmationsEnabled: true)`) plus persistent delivery and `mandatory: true`: the publish call completes only once the broker has taken responsibility, and throws if the message is nacked or unroutable. Without confirms, a dropped message looks like success.
    - **Connection opened lazily**, not at startup — a broker outage shouldn't stop an Api that still serves questions fine. One connection per process, a channel per publish.
-   - **The dual-write gap is deliberate and left visible:** the row is committed, *then* the message is published. With the broker stopped, `POST /submissions` returns 500 while the submission sits `Pending` with nothing queued to judge it (verified, not theorised). Item 8 closes this with a transactional outbox.
+   - **The dual-write gap was deliberate and left visible:** the row was committed, *then* the message published, so a broker outage meant a 500 for a submission that was in fact saved. Closed by item 8.
    - **One observation for later:** a message carrying Two Sum's large hidden test is ~290 KB. Fine for RabbitMQ now; revisit if test data grows (D7 notes the cap).
-   - **Local DB note:** the item 5 migration requires an empty `Questions` table (a new slug/limits column has no meaningful default). If yours holds old demo rows, the migrator fails with `column "Tags" of relation "Questions" contains null values` (rolled back, nothing half-applied). Either delete just those rows (`delete from "Submissions"; delete from "TestCases"; delete from "Questions";` in psql), or wipe everything local with `docker compose --profile full-stack down -v` (deletes the Postgres + RabbitMQ volumes).
+8. **Transactional outbox** (D6) — item 7's dual-write gap is closed: creating a submission never talks to the broker.
+   - `OutboxMessages` table; the judge request is staged on the same `DbContext` and committed by the **same `SaveChanges`** as the submission. Either both exist or neither does.
+   - `OutboxRelay` (a `BackgroundService`) polls and publishes. It claims rows with `FOR UPDATE SKIP LOCKED`, so a second instance skips claimed work rather than blocking or double-publishing.
+   - Failures back off exponentially (2s, doubling, capped at 1 min) with the attempt count and last error recorded on the row; processed rows are purged after 7 days.
+   - **At-least-once, not exactly-once:** if the broker confirms but the relay crashes before committing, the message is published again. Consumers must be idempotent — item 9's job.
+   - **Verified against a real outage:** with RabbitMQ stopped, `POST /submissions` returns **201** (it was 500 in item 7); the row waits in the outbox through three backing-off attempts, and the relay publishes it by itself seconds after the broker comes back.
 
 ## Roadmap — work top to bottom; a merged item moves up to "Already DONE"
 
@@ -102,8 +108,6 @@ Not final — revisit any row whose *why* stops holding.
 ### Phase 1 — Core judging loop (local, backend only)
 The heart of the product. Submissions keep a client-supplied `userId` until Phase 3 — acceptable only because nothing is deployed yet.
 
-8. **Transactional outbox** (D6) — close item 7's dual-write gap: the outbox row is written in the same DB transaction as the submission; a `BackgroundService` relays it to RabbitMQ.
-   *Learn:* the dual-write problem, at-least-once delivery, why every consumer must be idempotent.
 9. **Judge consumer with a fake executor** — manual ack, prefetch, idempotency check, retry + dead-letter queue; a `FakeSandboxExecutor` returns canned verdicts and publishes `SubmissionJudged`.
    *Learn:* competing consumers, ack/nack/requeue, poison messages, dead-letter exchanges.
 10. **Api consumes `SubmissionJudged`** — updates status and per-test-case results. First full end-to-end loop (Scalar → Api → Judge → Api → poll `GET /submissions/{id}`), still without real code execution.

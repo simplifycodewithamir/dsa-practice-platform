@@ -18,7 +18,7 @@ internal interface ISubmissionsService
 internal sealed class SubmissionsService(
     DsaPracticeDbContext db,
     TimeProvider timeProvider,
-    IJudgeRequestPublisher judgeRequestPublisher) : ISubmissionsService
+    IOutboxWriter outboxWriter) : ISubmissionsService
 {
     public async Task<SubmissionResponse> CreateSubmissionAsync(CreateSubmissionRequest request, CancellationToken cancellationToken)
     {
@@ -42,14 +42,15 @@ internal sealed class SubmissionsService(
         };
 
         db.Submissions.Add(submission);
-        await db.SaveChangesAsync(cancellationToken);
 
-        // Deliberately naive: the row is committed, then the message is published, as two separate
-        // operations. If the process dies in between -- or the broker is unreachable -- the
-        // submission sits Pending forever with nothing queued to judge it, and the caller sees a
-        // 500 for a submission that was in fact saved. That gap is the dual-write problem, and
-        // item 8 closes it with a transactional outbox. Left visible on purpose.
-        await judgeRequestPublisher.PublishAsync(JudgeRequestFactory.Create(submission, question), cancellationToken);
+        // The judge request is staged on the same DbContext, so this one SaveChanges commits the
+        // submission and the message to publish in a single transaction. Nothing here talks to the
+        // broker: a broker outage can no longer fail a submission, and a crash can no longer leave
+        // a saved submission with nothing queued to judge it. The relay publishes it, at least
+        // once, whenever the broker is reachable again.
+        outboxWriter.Enqueue(db, JudgeRequestFactory.Create(submission, question));
+
+        await db.SaveChangesAsync(cancellationToken);
 
         return SubmissionResponse.FromEntity(submission);
     }

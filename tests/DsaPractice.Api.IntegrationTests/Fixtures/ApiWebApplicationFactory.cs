@@ -44,7 +44,10 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>, I
     {
         builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["RabbitMq:Uri"] = _rabbitMq.GetConnectionString()
+            ["RabbitMq:Uri"] = _rabbitMq.GetConnectionString(),
+            // Tests drive OutboxProcessor directly so they assert what a relay pass does instead of
+            // racing its timer. The loop around it is covered by starting the app at all.
+            ["Outbox:RelayEnabled"] = "false"
         }));
 
         builder.ConfigureServices(services =>
