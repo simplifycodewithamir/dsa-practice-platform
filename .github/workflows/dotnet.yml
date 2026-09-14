@@ -6,8 +6,9 @@ name: Build and Test
 on:
   push:
     branches: [main]
+  # Every pull request, not only those targeting main: work is sometimes stacked one branch on
+  # the next, and those pull requests need checking too.
   pull_request:
-    branches: [main]
 
 jobs:
   build-and-test:
