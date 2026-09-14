@@ -31,15 +31,20 @@ services:
     volumes:
       - rabbitmqdata:/var/lib/rabbitmq
 
-  # One-shot: applies pending EF Core migrations, then exits. Run standalone whenever you
-  # just need the schema up to date (e.g. before debugging Api locally against dockerized
-  # Postgres): `docker compose run --rm migrator`. Also gates `api` in the full-stack profile.
+  # One-shot: applies pending EF Core migrations, upserts the questions under content/, then
+  # exits. Both halves are idempotent, so re-run it whenever the schema or the content changes:
+  # `docker compose run --rm migrator`. Also gates `api` in the full-stack profile.
   migrator:
     build:
       context: .
       dockerfile: source/DataMigrations/DsaPractice.DataMigrations.Postgres/Dockerfile
     environment:
       ConnectionStrings__DsaPractice: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      Content__Path: /app/content
+    volumes:
+      # Local dev: edit a statement or a test case and re-run the migrator, no image rebuild.
+      # The image carries its own copy of content/ for deployments (see the Dockerfile).
+      - ./content:/app/content:ro
     depends_on:
       postgres:
         condition: service_healthy
