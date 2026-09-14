@@ -110,6 +110,15 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
 
 9. **Judge consumer with a fake executor** — manual ack, prefetch, idempotency check, retry + dead-letter queue; a `FakeSandboxExecutor` returns canned verdicts and publishes `SubmissionJudged`.
    *Learn:* competing consumers, ack/nack/requeue, poison messages, dead-letter exchanges.
+9. **Judge consumer with a fake executor** — the Judge now consumes judge requests, "runs" them and publishes `SubmissionJudged`; the Api stores the result in item 10.
+   - **Acks last**, after the result is published: if the Judge dies mid-run the message was never acked, so the broker redelivers it. Prefetch is 1 — each submission will own a container.
+   - **Dead-letter queue** for anything rejected: an unparseable payload, or a run that failed. Both exchanges and all three queues are declared by `RabbitMqTopology`, shared by Api and Judge, because RabbitMQ refuses a redeclaration that disagrees with what exists.
+   - **A Judge failure still produces a verdict** (`InternalError`) as well as a dead-lettered copy — a submission stuck `Running` forever is worse for the user than an honest error.
+   - **Redelivery guard** (`ProcessedSubmissions`), deliberately best-effort and in-memory: re-running a submission is wasteful, not wrong, and the Api's consumer is the real idempotency gate.
+   - `VerdictAggregator` decides the verdict from per-test outcomes — first failure in run order wins — so the rule is one pure, tested function rather than something each executor repeats.
+   - **Messaging moved to `DsaPractice.Messaging`**, shared by both services: connection, publisher and the topology definition.
+   - **Contracts now own their JSON settings** (`ContractJson`). The end-to-end run caught the verdict going over the wire as `0` instead of `"Accepted"`, which would have made inserting an enum member silently rewrite the meaning of every queued message.
+   - **Nothing is executed yet:** `FakeSandboxExecutor` reports every test as passed and logs a warning saying so on every run. Item 11 replaces it.
 10. **Api consumes `SubmissionJudged`** — updates status and per-test-case results. First full end-to-end loop (Scalar → Api → Judge → Api → poll `GET /submissions/{id}`), still without real code execution.
     *Learn:* eventual consistency, status as a state machine, duplicate/out-of-order messages.
 11. **`ISandboxExecutor` via Docker.DotNet** — ephemeral container per run; CPU, memory, wall-clock and output-size limits (exact values proposed in the PR for review, per the project skill's hard rules); container always torn down, including on timeout and crash.

@@ -1,3 +1,4 @@
+using DsaPractice.Messaging;
 using System.Text.Json;
 using DsaPractice.Contracts;
 using DsaPractice.DataAccess;
@@ -18,8 +19,6 @@ internal interface IOutboxWriter
 
 internal sealed class OutboxWriter(IOptions<RabbitMqOptions> options, TimeProvider timeProvider) : IOutboxWriter
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
-
     public void Enqueue(DsaPracticeDbContext db, SubmissionJudgeRequested message)
     {
         var now = timeProvider.GetUtcNow();
@@ -30,7 +29,7 @@ internal sealed class OutboxWriter(IOptions<RabbitMqOptions> options, TimeProvid
             Type = nameof(SubmissionJudgeRequested),
             RoutingKey = options.Value.JudgeRequestedRoutingKey,
             MessageId = message.SubmissionId.ToString(),
-            Payload = JsonSerializer.Serialize(message, SerializerOptions),
+            Payload = JsonSerializer.Serialize(message, ContractJson.Options),
             OccurredAtUtc = now,
             NextAttemptAtUtc = now // due immediately
         });

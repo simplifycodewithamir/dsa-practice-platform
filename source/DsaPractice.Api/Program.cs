@@ -1,3 +1,4 @@
+using DsaPractice.Messaging;
 using System.Text.Json.Serialization;
 using DsaPractice.Api.Configuration;
 using DsaPractice.DataAccess;
@@ -60,6 +61,7 @@ builder.Services.AddOptions<RabbitMqOptions>()
     .ValidateOnStart();
 
 // One connection per process (opened on first publish), channels per publish.
+builder.Services.AddSingleton(new RabbitMqClientName("dsa-practice-api"));
 builder.Services.AddSingleton<IRabbitMqConnection, RabbitMqConnection>();
 builder.Services.AddSingleton<IMessagePublisher, RabbitMqPublisher>();
 

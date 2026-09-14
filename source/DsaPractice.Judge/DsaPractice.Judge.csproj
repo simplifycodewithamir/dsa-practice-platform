@@ -13,10 +13,17 @@
     <PackageReference Include="RabbitMQ.Client" />
     <PackageReference Include="Docker.DotNet"  />
     <PackageReference Include="Serilog.Extensions.Hosting"  />
+    <PackageReference Include="Serilog.Settings.Configuration" />
+    <PackageReference Include="Serilog.Sinks.Console" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DsaPractice.Contracts\DsaPractice.Contracts.csproj" />
+    <ProjectReference Include="..\DsaPractice.Messaging\DsaPractice.Messaging.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
