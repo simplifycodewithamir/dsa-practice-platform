@@ -3,6 +3,7 @@ import { useQuestion } from '../api/queries';
 import { ApiError } from '../api/client';
 import DifficultyBadge from '../components/DifficultyBadge';
 import Markdown from '../components/Markdown';
+import SubmitPanel from '../components/SubmitPanel';
 
 export default function QuestionPage() {
   const { slug = '' } = useParams();
@@ -73,6 +74,8 @@ export default function QuestionPage() {
           ))}
         </div>
       </section>
+
+      <SubmitPanel questionId={question.id!} />
     </article>
   );
 }
