@@ -77,6 +77,10 @@ builder.Services.AddSingleton<IOutboxWriter, OutboxWriter>();
 builder.Services.AddScoped<OutboxProcessor>();
 builder.Services.AddHostedService<OutboxRelay>();
 
+// Judge results come back asynchronously; this applies them to the submission.
+builder.Services.AddScoped<JudgedResultRecorder>();
+builder.Services.AddHostedService<JudgedResultConsumer>();
+
 builder.Services.AddScoped<IQuestionsService, QuestionsService>();
 builder.Services.AddScoped<ISubmissionsService, SubmissionsService>();
 

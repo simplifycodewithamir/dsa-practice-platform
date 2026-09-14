@@ -15,7 +15,10 @@ internal sealed record SubmissionResponse(
     string Language,
     SubmissionStatus Status,
     SubmissionVerdict? Verdict,
-    DateTimeOffset SubmittedAtUtc)
+    DateTimeOffset SubmittedAtUtc,
+    DateTimeOffset? CompletedAtUtc = null,
+    string? CompileOutput = null,
+    IReadOnlyList<SubmissionTestResultResponse>? TestResults = null)
 {
     public static SubmissionResponse FromEntity(Submission submission) => new(
         submission.Id,
@@ -24,8 +27,24 @@ internal sealed record SubmissionResponse(
         submission.Language,
         submission.Status,
         submission.Verdict,
-        submission.SubmittedAtUtc);
+        submission.SubmittedAtUtc,
+        submission.CompletedAtUtc,
+        submission.CompileOutput,
+        TestResults: []);
 }
+
+/// <summary>
+/// One test case's outcome. <see cref="ActualOutput"/> and <see cref="ErrorMessage"/> are null for
+/// a hidden test case: the user learns that it failed, never what it contained -- otherwise the
+/// hidden tests could be reconstructed one submission at a time.
+/// </summary>
+internal sealed record SubmissionTestResultResponse(
+    int Ordinal,
+    bool IsHidden,
+    bool Passed,
+    long ExecutionTimeMs,
+    string? ActualOutput,
+    string? ErrorMessage);
 
 internal sealed class CreateSubmissionRequestValidator : AbstractValidator<CreateSubmissionRequest>
 {

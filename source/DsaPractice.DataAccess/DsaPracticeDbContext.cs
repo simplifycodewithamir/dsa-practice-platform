@@ -10,6 +10,7 @@ public sealed class DsaPracticeDbContext(DbContextOptions<DsaPracticeDbContext> 
     public DbSet<TestCase> TestCases => Set<TestCase>();
     public DbSet<Submission> Submissions => Set<Submission>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<SubmissionTestResult> SubmissionTestResults => Set<SubmissionTestResult>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
