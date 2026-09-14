@@ -10,7 +10,6 @@ using DsaPractice.DataAccess.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RabbitMQ.Client;
-using RabbitMQ.Client.Exceptions;
 using Xunit;
 
 namespace DsaPractice.Api.IntegrationTests.Messaging;
@@ -26,7 +25,7 @@ public class OutboxTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task CreateSubmission_WritesOutboxRowAndPublishesNothingInline()
     {
-        await PurgeQueueAsync();
+        await MessagingState.ResetAsync(factory);
         var question = await SeedQuestionAsync();
         using var client = factory.CreateClient();
 
@@ -39,7 +38,7 @@ public class OutboxTests(ApiWebApplicationFactory factory)
         var created = await response.Content.ReadFromJsonAsync<SubmissionResponse>(TestJson.Options, TestContext.Current.CancellationToken);
 
         // Nothing reaches the broker until the relay runs.
-        Assert.Null(await TryGetAnyMessageAsync());
+        Assert.Null(await MessagingState.TryGetMessageAsync(factory));
 
         var row = await GetOutboxRowAsync(created!.Id);
         Assert.Equal(nameof(SubmissionJudgeRequested), row.Type);
@@ -55,6 +54,7 @@ public class OutboxTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task CreateSubmission_UnknownQuestion_WritesNoOutboxRow()
     {
+        await MessagingState.ResetAsync(factory);
         var before = await CountOutboxRowsAsync();
         using var client = factory.CreateClient();
 
@@ -71,7 +71,7 @@ public class OutboxTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task ProcessPendingAsync_PublishesPendingRowAndMarksItProcessed()
     {
-        await PurgeQueueAsync();
+        await MessagingState.ResetAsync(factory);
         var submissionId = await EnqueueAsync();
 
         var published = await RunRelayPassAsync();
@@ -90,7 +90,7 @@ public class OutboxTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task ProcessPendingAsync_RunTwice_DoesNotPublishTheSameRowAgain()
     {
-        await PurgeQueueAsync();
+        await MessagingState.ResetAsync(factory);
         var submissionId = await EnqueueAsync();
         await RunRelayPassAsync();
         await DrainQueueAsync();
@@ -98,12 +98,13 @@ public class OutboxTests(ApiWebApplicationFactory factory)
         await RunRelayPassAsync();
 
         // Processed rows are never looked at again.
-        Assert.Null(await TryGetAnyMessageAsync());
+        Assert.Null(await MessagingState.TryGetMessageAsync(factory));
     }
 
     [Fact]
     public async Task ProcessPendingAsync_UnroutableMessage_LeavesRowPendingWithBackoffAndError()
     {
+        await MessagingState.ResetAsync(factory);
         // Nothing is bound to this routing key, so the broker returns the message and the
         // confirmed publish throws -- standing in for any publish failure.
         var submissionId = await EnqueueAsync(routingKey: "submission.nobody-is-listening");
@@ -121,18 +122,19 @@ public class OutboxTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task ProcessPendingAsync_RowNotDueYet_IsLeftAlone()
     {
-        await PurgeQueueAsync();
+        await MessagingState.ResetAsync(factory);
         var submissionId = await EnqueueAsync(nextAttemptInSeconds: 3600);
 
         await RunRelayPassAsync();
 
-        Assert.Null(await TryGetAnyMessageAsync());
+        Assert.Null(await MessagingState.TryGetMessageAsync(factory));
         Assert.Null((await GetOutboxRowAsync(submissionId)).ProcessedAtUtc);
     }
 
     [Fact]
     public async Task PurgeProcessedAsync_DeletesOnlyLongProcessedRows()
     {
+        await MessagingState.ResetAsync(factory);
         var oldProcessed = await EnqueueAsync(processedDaysAgo: 30);
         var recentProcessed = await EnqueueAsync(processedDaysAgo: 1);
         var pending = await EnqueueAsync();
@@ -220,7 +222,7 @@ public class OutboxTests(ApiWebApplicationFactory factory)
         var deadline = DateTime.UtcNow.AddSeconds(10);
         while (DateTime.UtcNow < deadline)
         {
-            var result = await TryGetAnyMessageAsync();
+            var result = await MessagingState.TryGetMessageAsync(factory);
             if (result?.BasicProperties.MessageId == submissionId.ToString())
             {
                 return result;
@@ -234,37 +236,10 @@ public class OutboxTests(ApiWebApplicationFactory factory)
 
     private async Task DrainQueueAsync()
     {
-        while (await TryGetAnyMessageAsync() is not null)
+        while (await MessagingState.TryGetMessageAsync(factory) is not null)
         {
         }
     }
 
-    private async Task PurgeQueueAsync()
-    {
-        await using var channel = await factory.RabbitMqConnection.CreateChannelAsync(cancellationToken: TestContext.Current.CancellationToken);
-        try
-        {
-            await channel.QueuePurgeAsync(ApiWebApplicationFactory.JudgeRequestQueue, TestContext.Current.CancellationToken);
-        }
-        catch (OperationInterruptedException exception) when (exception.ShutdownReason?.ReplyCode == Constants.NotFound)
-        {
-            // Nothing published yet in this run.
-        }
-    }
 
-    private async Task<BasicGetResult?> TryGetAnyMessageAsync()
-    {
-        await using var channel = await factory.RabbitMqConnection.CreateChannelAsync(cancellationToken: TestContext.Current.CancellationToken);
-        try
-        {
-            return await channel.BasicGetAsync(
-                ApiWebApplicationFactory.JudgeRequestQueue,
-                autoAck: true,
-                cancellationToken: TestContext.Current.CancellationToken);
-        }
-        catch (OperationInterruptedException exception) when (exception.ShutdownReason?.ReplyCode == Constants.NotFound)
-        {
-            return null;
-        }
-    }
 }
