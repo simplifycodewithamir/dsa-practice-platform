@@ -126,8 +126,13 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
     - Output is truncated to 4000 characters on the way in: submitted code decides that string's length, so the database must not.
     - A result for an unknown submission is acked and discarded (nothing to retry); a database failure is requeued.
     - Verified end to end on the running stack: submit → `Completed` with `"verdict": "Accepted"` and 5 results in about a second.
-11. **`ISandboxExecutor` via Docker.DotNet** — ephemeral container per run; CPU, memory, wall-clock and output-size limits (exact values proposed in the PR for review, per the project skill's hard rules); container always torn down, including on timeout and crash.
-    *Learn:* Docker Engine API, cgroups, OOM-kill detection, mapping exit codes to verdicts.
+11. **`ISandboxExecutor` via Docker.DotNet** — one throwaway container per test case, never reused.
+    - **Limits, all configurable** (proposed for review per the project skill): 1 CPU, the question's own memory limit with swap disabled, 64 pids, the question's time limit plus a 3s startup grace before the kill, 64 KB of captured output, a 32 MB tmpfs.
+    - **Isolation:** no network at all, read-only root filesystem, every capability dropped, `no-new-privileges`, runs as `nobody`, writable space only in an in-memory tmpfs that dies with the container.
+    - **Source arrives as a base64 environment variable** the container writes itself. Docker refuses to copy into a read-only rootfs, and a bind mount would expose a host path to submitted code (and wouldn't resolve at all once the Judge runs in a container against the host daemon).
+    - **Timed by the container's own start/finish timestamps**, not the wall clock around the call: container startup costs hundreds of milliseconds and charging the submitter for the daemon's overhead fails correct solutions on a busy host. The wall clock still decides when to kill.
+    - **Stops at the first failing test case** — the verdict is already decided, so the rest is spent sandbox time.
+    - Switched to the maintained `Docker.DotNet.Enhanced` fork: Testcontainers already depends on it, and two packages producing `Docker.DotNet.dll` resolved to whichever NuGet picked.
 12. **Python runner** — first real language: fastest startup, simplest image.
 13. **C# runner** — separate compile and run steps, each with its own limits; benchmark `dotnet run app.cs` (.NET 10 file-based apps) against invoking `csc` directly, keep the faster.
     *Learn:* compilation cost, image-size trade-offs, cold vs warm starts.
