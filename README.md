@@ -151,7 +151,11 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
     - **`SandboxEscapeTests` (9)**: no Docker socket, no capabilities, `NoNewPrivs`, no other processes visible, no mounting, no writing to `/proc/sysrq-trigger`, no reading `/dev/sda`, the pids cap holds even after the program raises its own rlimits, and nothing survives the run.
 
 ### Phase 2 — Frontend (local)
-15. **Scaffold** (D10) — Vite + React + TS + React Router v7 + TanStack Query + Tailwind; typed API client generated from the Api's OpenAPI document; CORS on the Api for the dev origin.
+15. **Scaffold** (D10) — Vite + React + TS + React Router v7 + TanStack Query + Tailwind v4, app shell and routing (`/`, `/problems/:slug`).
+    - **The API client is generated, not written**: `openapi-typescript` turns the Api's OpenAPI document into types, and every request/response type derives from it, so a contract change breaks the build rather than the page. Only possible because item 11 made the Api describe its responses.
+    - Submission polling **stops** once a submission is `Completed` (D11) rather than polling forever.
+    - CORS on the Api from `Cors:AllowedOrigins`, empty by default so nothing cross-origin is allowed unless named; in dev the Vite proxy means the browser sees one origin and never asks.
+    - **No Node on this machine**, so `frontend/README.md` documents running the toolchain through a `node:22-alpine` container. CI uses `setup-node` normally.
 16. **Question list + question page** — filter by difficulty/tag, rendered markdown statement, sample tests; question pages prerendered at build time.
 17. **Editor, submit, verdict** — Monaco, language picker, submit, poll until a final verdict, per-test-case results (hidden tests show pass/fail only).
 18. **Playwright E2E suite** — browse → open → submit → verdict, run in CI. A permanent suite, separate from the ad-hoc PR-demo recorder in the `git-workflow` skill.
