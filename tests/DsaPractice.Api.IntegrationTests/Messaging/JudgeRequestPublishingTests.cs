@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using DsaPractice.Api.Endpoints;
 using DsaPractice.Api.IntegrationTests.Fixtures;
+using DsaPractice.Api.Messaging;
 using DsaPractice.Contracts;
 using DsaPractice.DataAccess;
 using DsaPractice.DataAccess.Entities;
@@ -17,6 +18,9 @@ namespace DsaPractice.Api.IntegrationTests.Messaging;
 /// Publishing goes through a real broker: the parts worth testing here (the topology actually
 /// being declared, the message landing on the bound queue, the broker confirming the publish)
 /// have no meaning against a mock.
+///
+/// Since item 8 the Api writes to the outbox instead of publishing inline, so each test runs a
+/// relay pass to get the message onto the broker. What arrives there is what these assert.
 /// </summary>
 [Collection(ApiTestCollection.Name)]
 public class JudgeRequestPublishingTests(ApiWebApplicationFactory factory)
@@ -33,6 +37,7 @@ public class JudgeRequestPublishingTests(ApiWebApplicationFactory factory)
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var created = await response.Content.ReadFromJsonAsync<SubmissionResponse>(TestJson.Options, TestContext.Current.CancellationToken);
+        await RunRelayPassAsync();
 
         var message = await ReadJudgeRequestAsync(created!.Id);
         Assert.Equal(question.Id, message.QuestionId);
@@ -56,6 +61,7 @@ public class JudgeRequestPublishingTests(ApiWebApplicationFactory factory)
 
         using var response = await client.PostAsJsonAsync("/api/v1/submissions", request, TestContext.Current.CancellationToken);
         var created = await response.Content.ReadFromJsonAsync<SubmissionResponse>(TestJson.Options, TestContext.Current.CancellationToken);
+        await RunRelayPassAsync();
 
         var result = await GetMessageAsync(created!.Id);
 
@@ -74,9 +80,17 @@ public class JudgeRequestPublishingTests(ApiWebApplicationFactory factory)
         var request = new CreateSubmissionRequest(Guid.NewGuid(), "user-1", "python", "print(1)");
 
         using var response = await client.PostAsJsonAsync("/api/v1/submissions", request, TestContext.Current.CancellationToken);
+        await RunRelayPassAsync();
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Null(await TryGetAnyMessageAsync());
+    }
+
+    private async Task RunRelayPassAsync()
+    {
+        using var scope = factory.Services.CreateScope();
+        var processor = scope.ServiceProvider.GetRequiredService<OutboxProcessor>();
+        await processor.ProcessPendingAsync(TestContext.Current.CancellationToken);
     }
 
     private async Task<SubmissionJudgeRequested> ReadJudgeRequestAsync(Guid submissionId)
