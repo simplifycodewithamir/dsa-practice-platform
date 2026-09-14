@@ -61,7 +61,19 @@ builder.Services.AddOptions<RabbitMqOptions>()
 
 // One connection per process (opened on first publish), channels per publish.
 builder.Services.AddSingleton<IRabbitMqConnection, RabbitMqConnection>();
-builder.Services.AddSingleton<IJudgeRequestPublisher, JudgeRequestPublisher>();
+builder.Services.AddSingleton<IMessagePublisher, RabbitMqPublisher>();
+
+// Submissions are never published inline -- they are written to the outbox in the same
+// transaction, and this relay publishes them (decision D6).
+builder.Services.AddOptions<OutboxOptions>()
+    .Bind(builder.Configuration.GetSection(OutboxOptions.SectionName))
+    .Validate(o => o.PollInterval > TimeSpan.Zero, "Outbox:PollInterval must be greater than zero.")
+    .Validate(o => o.BatchSize > 0, "Outbox:BatchSize must be greater than zero.")
+    .ValidateOnStart();
+
+builder.Services.AddSingleton<IOutboxWriter, OutboxWriter>();
+builder.Services.AddScoped<OutboxProcessor>();
+builder.Services.AddHostedService<OutboxRelay>();
 
 builder.Services.AddScoped<IQuestionsService, QuestionsService>();
 builder.Services.AddScoped<ISubmissionsService, SubmissionsService>();
