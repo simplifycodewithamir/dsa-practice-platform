@@ -4,6 +4,13 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // `vite preview` serves the production build, which is what the Playwright suite runs against;
+  // it needs the same /api proxy the dev server has.
+  preview: {
+    proxy: {
+      '/api': { target: 'http://localhost:8080', changeOrigin: true },
+    },
+  },
   server: {
     // Dev talks to the Api through this proxy, so the browser sees one origin and CORS never
     // enters into it locally. In production the two are on different hosts, which is why the Api

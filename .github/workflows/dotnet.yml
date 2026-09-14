@@ -53,3 +53,68 @@ jobs:
           dotnet test --project tests/DsaPractice.Api.IntegrationTests/DsaPractice.Api.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
           dotnet test --project tests/DsaPractice.ContentSeeding.IntegrationTests/DsaPractice.ContentSeeding.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
           dotnet test --project tests/DsaPractice.Judge.IntegrationTests/DsaPractice.Judge.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
+
+  # The whole product against itself: real Api, real broker, and a Judge that runs submitted code
+  # in a container. Its own job, because it builds images and is slower than the unit suites.
+  end-to-end:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Write .env for docker compose
+        run: |
+          {
+            echo "POSTGRES_DB=dsapractice"
+            echo "POSTGRES_USER=dsapractice"
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
+            echo "RABBITMQ_USER=dsapractice"
+            echo "RABBITMQ_PASSWORD=$(openssl rand -hex 16)"
+          } > .env
+
+      - name: Start the stack
+        run: docker compose --profile full-stack up -d --build
+
+      - name: Wait for the Api
+        run: |
+          for _ in $(seq 1 90); do
+            curl -sf http://localhost:8080/health && exit 0
+            sleep 2
+          done
+          echo "Api never became healthy"; docker compose logs --tail=50; exit 1
+
+      - name: Build the frontend
+        run: npm ci && npm run build
+        working-directory: frontend
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: End-to-end tests
+        run: npm run test:e2e
+        working-directory: frontend
+
+      - name: Service logs on failure
+        if: failure()
+        run: docker compose --profile full-stack logs --tail=200
+
+      - name: Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+          retention-days: 7
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose --profile full-stack down -v
+
