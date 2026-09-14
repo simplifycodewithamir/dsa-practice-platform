@@ -133,7 +133,10 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
     - **Timed by the container's own start/finish timestamps**, not the wall clock around the call: container startup costs hundreds of milliseconds and charging the submitter for the daemon's overhead fails correct solutions on a busy host. The wall clock still decides when to kill.
     - **Stops at the first failing test case** — the verdict is already decided, so the rest is spent sandbox time.
     - Switched to the maintained `Docker.DotNet.Enhanced` fork: Testcontainers already depends on it, and two packages producing `Docker.DotNet.dll` resolved to whichever NuGet picked.
-12. **Python runner** — first real language: fastest startup, simplest image.
+12. **Python runner** — real execution is on by default: `python:3.12-alpine`, `TimeLimitMultiplier` 2.0 (a question's limit is written with a native-speed solution in mind, so an interpreter needs more of it for the same algorithm).
+    - Verified against the committed reference solutions, not toy code: `two-sum/solutions/reference.py` is Accepted on all 5 tests, including the 50,000-element hidden one at ~150 ms.
+    - Verified the failure paths end to end too: wrong output → `WrongAnswer`, an exception → `RuntimeError` carrying Python's traceback, an infinite loop → `TimeLimitExceeded`, and the brute-force O(n²) Two Sum → `TimeLimitExceeded` on exactly the large hidden test the content ships to reject it.
+    - The tests read the Judge's **shipped** `appsettings.json`, so a broken runner configuration fails a test rather than only production.
 13. **C# runner** — separate compile and run steps, each with its own limits; benchmark `dotnet run app.cs` (.NET 10 file-based apps) against invoking `csc` directly, keep the faster.
     *Learn:* compilation cost, image-size trade-offs, cold vs warm starts.
 14. **Sandbox hardening + escape test suite** — `--network none`, read-only rootfs + small tmpfs, `cap-drop ALL`, `no-new-privileges`, pids limit, non-root user, default seccomp profile; the Judge reaches Docker through a restricted socket proxy instead of the raw, root-equivalent `docker.sock`; evaluate gVisor (`runsc`). Integration tests submit hostile code: fork bomb, infinite loop, 10 GB allocation, outbound network call, writes outside `/tmp`, output flood.
