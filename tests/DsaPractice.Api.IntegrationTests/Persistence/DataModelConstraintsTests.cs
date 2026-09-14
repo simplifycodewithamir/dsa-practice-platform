@@ -91,7 +91,9 @@ public class DataModelConstraintsTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task SaveSubmission_UnknownQuestion_ViolatesForeignKey()
     {
-        var error = await SaveExpectingFailureAsync(db => db.Submissions.Add(NewSubmission(questionId: Guid.NewGuid())));
+        var userId = (await TestData.SeedUserAsync(factory)).Id;
+
+        var error = await SaveExpectingFailureAsync(db => db.Submissions.Add(NewSubmission(Guid.NewGuid(), userId)));
 
         Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, error.SqlState);
         Assert.Equal("FK_Submissions_Questions_QuestionId", error.ConstraintName);
@@ -104,8 +106,9 @@ public class DataModelConstraintsTests(ApiWebApplicationFactory factory)
     public async Task SaveSubmission_VerdictNotMatchingStatus_ViolatesVerdictCheck(SubmissionStatus status, SubmissionVerdict? verdict)
     {
         var question = await TestData.SeedAsync(factory, TestData.NewQuestion());
+        var userId = (await TestData.SeedUserAsync(factory)).Id;
 
-        var error = await SaveExpectingFailureAsync(db => db.Submissions.Add(NewSubmission(question.Id, status, verdict)));
+        var error = await SaveExpectingFailureAsync(db => db.Submissions.Add(NewSubmission(question.Id, userId, status, verdict)));
 
         Assert.Equal(PostgresErrorCodes.CheckViolation, error.SqlState);
         Assert.Equal("CK_Submissions_Verdict_OnlyWhenCompleted", error.ConstraintName);
@@ -118,7 +121,8 @@ public class DataModelConstraintsTests(ApiWebApplicationFactory factory)
     public async Task SaveSubmission_VerdictMatchingStatus_Succeeds(SubmissionStatus status, SubmissionVerdict? verdict)
     {
         var question = await TestData.SeedAsync(factory, TestData.NewQuestion());
-        var submission = NewSubmission(question.Id, status, verdict);
+        var userId = (await TestData.SeedUserAsync(factory)).Id;
+        var submission = NewSubmission(question.Id, userId, status, verdict);
 
         using (var scope = factory.Services.CreateScope())
         {
@@ -152,11 +156,11 @@ public class DataModelConstraintsTests(ApiWebApplicationFactory factory)
         return await db.TestCases.CountAsync(tc => tc.QuestionId == questionId, TestContext.Current.CancellationToken);
     }
 
-    private static Submission NewSubmission(Guid questionId, SubmissionStatus status = SubmissionStatus.Pending, SubmissionVerdict? verdict = null) => new()
+    private static Submission NewSubmission(Guid questionId, Guid userId, SubmissionStatus status = SubmissionStatus.Pending, SubmissionVerdict? verdict = null) => new()
     {
         Id = Guid.NewGuid(),
         QuestionId = questionId,
-        UserId = "user-1",
+        OwnerUserId = userId,
         Language = "python",
         SourceCode = "print(1)",
         Status = status,

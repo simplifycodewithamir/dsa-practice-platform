@@ -11,6 +11,7 @@ public sealed class DsaPracticeDbContext(DbContextOptions<DsaPracticeDbContext> 
     public DbSet<Submission> Submissions => Set<Submission>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<SubmissionTestResult> SubmissionTestResults => Set<SubmissionTestResult>();
+    public DbSet<User> Users => Set<User>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

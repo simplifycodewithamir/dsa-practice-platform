@@ -31,7 +31,7 @@ public class OutboxTests(ApiWebApplicationFactory factory)
 
         using var response = await client.PostAsJsonAsync(
             "/api/v1/submissions",
-            new CreateSubmissionRequest(question.Id, "user-1", "python", "print(1)"),
+            new CreateSubmissionRequest(question.Id, "python", "print(1)"),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -60,7 +60,7 @@ public class OutboxTests(ApiWebApplicationFactory factory)
 
         using var response = await client.PostAsJsonAsync(
             "/api/v1/submissions",
-            new CreateSubmissionRequest(Guid.NewGuid(), "user-1", "python", "print(1)"),
+            new CreateSubmissionRequest(Guid.NewGuid(), "python", "print(1)"),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);

@@ -2,6 +2,7 @@ using DsaPractice.DataAccess.Enums;
 using DsaPractice.DataAccess;
 using DsaPractice.DataAccess.Entities;
 using DsaPractice.Api.Endpoints;
+using DsaPractice.Api.Auth;
 using DsaPractice.Api.Exceptions;
 using DsaPractice.Api.Messaging;
 using Microsoft.EntityFrameworkCore;
@@ -18,7 +19,8 @@ internal interface ISubmissionsService
 internal sealed class SubmissionsService(
     DsaPracticeDbContext db,
     TimeProvider timeProvider,
-    IOutboxWriter outboxWriter) : ISubmissionsService
+    IOutboxWriter outboxWriter,
+    ICurrentUserProvider currentUserProvider) : ISubmissionsService
 {
     public async Task<SubmissionResponse> CreateSubmissionAsync(CreateSubmissionRequest request, CancellationToken cancellationToken)
     {
@@ -30,11 +32,14 @@ internal sealed class SubmissionsService(
             .FirstOrDefaultAsync(q => q.Id == request.QuestionId, cancellationToken)
             ?? throw new NotFoundException($"Question '{request.QuestionId}' was not found.");
 
+        // Provisioned on first sight, so a first-time submitter needs no registration step.
+        var user = await currentUserProvider.GetOrCreateAsync(cancellationToken);
+
         var submission = new Submission
         {
             Id = Guid.NewGuid(),
             QuestionId = request.QuestionId,
-            UserId = request.UserId,
+            OwnerUserId = user.Id,
             Language = request.Language,
             SourceCode = request.SourceCode,
             Status = SubmissionStatus.Pending,

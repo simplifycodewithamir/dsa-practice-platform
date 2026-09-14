@@ -230,7 +230,6 @@ export interface components {
         CreateSubmissionRequest: {
             /** Format: uuid */
             questionId: string;
-            userId: string;
             language: string;
             sourceCode: string;
         };
@@ -274,6 +273,7 @@ export interface components {
             id: string;
             /** Format: uuid */
             questionId: string;
+            /** Format: uuid */
             userId: string;
             language: string;
             status: components["schemas"]["SubmissionStatus"];

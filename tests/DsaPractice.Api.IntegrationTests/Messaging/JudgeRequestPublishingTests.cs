@@ -30,7 +30,7 @@ public class JudgeRequestPublishingTests(ApiWebApplicationFactory factory)
         await MessagingState.ResetAsync(factory);
         var question = await SeedQuestionWithTestCasesAsync();
         using var client = factory.CreateClient();
-        var request = new CreateSubmissionRequest(question.Id, "user-1", "python", "print(1)");
+        var request = new CreateSubmissionRequest(question.Id, "python", "print(1)");
 
         using var response = await client.PostAsJsonAsync("/api/v1/submissions", request, TestContext.Current.CancellationToken);
 
@@ -56,7 +56,7 @@ public class JudgeRequestPublishingTests(ApiWebApplicationFactory factory)
         await MessagingState.ResetAsync(factory);
         var question = await SeedQuestionWithTestCasesAsync();
         using var client = factory.CreateClient();
-        var request = new CreateSubmissionRequest(question.Id, "user-1", "python", "print(1)");
+        var request = new CreateSubmissionRequest(question.Id, "python", "print(1)");
 
         using var response = await client.PostAsJsonAsync("/api/v1/submissions", request, TestContext.Current.CancellationToken);
         var created = await response.Content.ReadFromJsonAsync<SubmissionResponse>(TestJson.Options, TestContext.Current.CancellationToken);
@@ -76,7 +76,7 @@ public class JudgeRequestPublishingTests(ApiWebApplicationFactory factory)
         // Other tests leave pending outbox rows, and a relay pass would publish those too.
         await MessagingState.ResetAsync(factory);
         using var client = factory.CreateClient();
-        var request = new CreateSubmissionRequest(Guid.NewGuid(), "user-1", "python", "print(1)");
+        var request = new CreateSubmissionRequest(Guid.NewGuid(), "python", "print(1)");
 
         using var response = await client.PostAsJsonAsync("/api/v1/submissions", request, TestContext.Current.CancellationToken);
         await RunRelayPassAsync();

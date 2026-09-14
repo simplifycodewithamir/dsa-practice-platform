@@ -20,6 +20,8 @@ export default defineConfig({
     },
   },
   test: {
+    // The Playwright specs live in e2e/ and use @playwright/test, which Vitest cannot run.
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],

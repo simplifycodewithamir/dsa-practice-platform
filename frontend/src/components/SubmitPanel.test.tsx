@@ -35,8 +35,9 @@ describe('SubmitPanel', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body).toMatchObject({ questionId: 'q1', language: 'csharp', sourceCode: 'Console.WriteLine(1);' });
-    expect(body.userId).toMatch(/^anon-/);
+    expect(body).toEqual({ questionId: 'q1', language: 'csharp', sourceCode: 'Console.WriteLine(1);' });
+    // No userId: sending one would be a claim the caller is not entitled to make.
+    expect(body.userId).toBeUndefined();
   });
 
   it('polls until the submission is judged, then shows the verdict', async () => {
