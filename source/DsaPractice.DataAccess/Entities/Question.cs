@@ -40,4 +40,39 @@ public sealed class Submission
     public SubmissionStatus Status { get; set; } = SubmissionStatus.Pending;
     public SubmissionVerdict? Verdict { get; set; } // set exactly when Status is Completed
     public DateTimeOffset SubmittedAtUtc { get; set; }
+    public DateTimeOffset? CompletedAtUtc { get; set; }
+
+    /// <summary>Compiler output when the submission didn't compile; null otherwise.</summary>
+    public string? CompileOutput { get; set; }
+
+    public List<SubmissionTestResult> TestResults { get; set; } = [];
+}
+
+/// <summary>
+/// What one test case did for one submission. Written by the Judge's result consumer, never by a
+/// request handler.
+/// </summary>
+public sealed class SubmissionTestResult
+{
+    /// <summary>
+    /// Output is captured from submitted code, so it is capped in the database as well as in the
+    /// sandbox: a program that prints a gigabyte must not turn one row into one.
+    /// </summary>
+    public const int MaxOutputLength = 4000;
+
+    public Guid Id { get; set; }
+    public Guid SubmissionId { get; set; }
+
+    /// <summary>The test case this is the outcome of. Not a foreign key: a test case can be
+    /// removed from the content while old submissions still reference what it did.</summary>
+    public Guid TestCaseId { get; set; }
+
+    public required int Ordinal { get; set; }
+    public required bool Passed { get; set; }
+
+    /// <summary>What the program printed. Never returned to a user for a hidden test case.</summary>
+    public string? ActualOutput { get; set; }
+
+    public string? ErrorMessage { get; set; }
+    public long ExecutionTimeMs { get; set; }
 }

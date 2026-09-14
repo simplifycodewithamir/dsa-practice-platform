@@ -119,8 +119,13 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
    - **Messaging moved to `DsaPractice.Messaging`**, shared by both services: connection, publisher and the topology definition.
    - **Contracts now own their JSON settings** (`ContractJson`). The end-to-end run caught the verdict going over the wire as `0` instead of `"Accepted"`, which would have made inserting an enum member silently rewrite the meaning of every queued message.
    - **Nothing is executed yet:** `FakeSandboxExecutor` reports every test as passed and logs a warning saying so on every run. Item 11 replaces it.
-10. **Api consumes `SubmissionJudged`** — updates status and per-test-case results. First full end-to-end loop (Scalar → Api → Judge → Api → poll `GET /submissions/{id}`), still without real code execution.
-    *Learn:* eventual consistency, status as a state machine, duplicate/out-of-order messages.
+10. **Api consumes `SubmissionJudged`** — the loop is closed: a submission goes to `Completed` with a verdict and per-test results, visible through `GET /api/v1/submissions/{id}`.
+    - `SubmissionTestResults` table, plus `CompletedAtUtc` and `CompileOutput` on the submission.
+    - **Idempotent by design, not by luck:** a submission that is already `Completed` is left untouched, because at-least-once delivery makes a duplicate result normal and a late one must not overwrite a verdict the user has already seen.
+    - **Hidden test cases stay hidden**: the response says a hidden case failed, never what it printed — otherwise the hidden tests could be reconstructed one submission at a time.
+    - Output is truncated to 4000 characters on the way in: submitted code decides that string's length, so the database must not.
+    - A result for an unknown submission is acked and discarded (nothing to retry); a database failure is requeued.
+    - Verified end to end on the running stack: submit → `Completed` with `"verdict": "Accepted"` and 5 results in about a second.
 11. **`ISandboxExecutor` via Docker.DotNet** — ephemeral container per run; CPU, memory, wall-clock and output-size limits (exact values proposed in the PR for review, per the project skill's hard rules); container always torn down, including on timeout and crash.
     *Learn:* Docker Engine API, cgroups, OOM-kill detection, mapping exit codes to verdicts.
 12. **Python runner** — first real language: fastest startup, simplest image.
