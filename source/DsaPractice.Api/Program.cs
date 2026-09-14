@@ -81,6 +81,15 @@ builder.Services.AddHostedService<OutboxRelay>();
 builder.Services.AddScoped<JudgedResultRecorder>();
 builder.Services.AddHostedService<JudgedResultConsumer>();
 
+// The frontend is served from a different origin in production (Cloudflare Pages in front of an
+// api. subdomain, decision D2). Allowed origins are configuration, and an empty list means no
+// cross-origin caller is allowed at all -- locally the Vite dev server proxies /api instead, so
+// the browser sees one origin and never asks.
+builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
+    .WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [])
+    .WithMethods("GET", "POST")
+    .WithHeaders("content-type", "authorization")));
+
 builder.Services.AddScoped<IQuestionsService, QuestionsService>();
 builder.Services.AddScoped<ISubmissionsService, SubmissionsService>();
 
@@ -101,6 +110,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors();
 
 app.MapGroup("/api/v1/questions").MapQuestionsEndpoints();
 app.MapGroup("/api/v1/submissions").MapSubmissionsEndpoints();

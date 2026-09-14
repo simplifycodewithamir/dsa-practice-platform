@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* Difficulty colours live here rather than in every component that shows a badge. */
+@theme {
+  --color-easy: oklch(0.72 0.17 152);
+  --color-medium: oklch(0.75 0.16 75);
+  --color-hard: oklch(0.65 0.21 25);
+}
