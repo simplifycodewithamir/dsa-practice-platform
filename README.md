@@ -160,7 +160,11 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
     - Failures are reported as failures: an empty list would read as "no questions exist", and a 404 gets its own message rather than a generic error.
     - `react-markdown` without `rehype-raw`, so a statement cannot inject markup.
     - **Prerendering moved to item 30**, where the rest of SEO lives — it needs React Router's framework mode, which is a restructure rather than a page change.
-17. **Editor, submit, verdict** — Monaco, language picker, submit, poll until a final verdict, per-test-case results (hidden tests show pass/fail only).
+17. **Editor, submit, verdict** — Monaco with a language picker, submit, and a verdict that appears on its own as polling settles.
+    - Verdicts are spelled out for a person ("Time limit exceeded", not `TimeLimitExceeded`), and a judge failure says it is not the submitter's fault.
+    - **Hidden test cases show pass/fail and a duration, never output** — the Api already withholds it, and the UI would not render it even if it arrived.
+    - Submitting is disabled while judging, so a second run cannot replace a result nobody has read yet; switching language keeps code the user actually wrote.
+    - **`userId` is a random id in localStorage** until items 19–20. It is not a login and proves nothing; the Api stops taking a client-supplied id in item 19.
 18. **Playwright E2E suite** — browse → open → submit → verdict, run in CI. A permanent suite, separate from the ad-hoc PR-demo recorder in the `git-workflow` skill.
 
 ### Phase 3 — Identity & accounts
