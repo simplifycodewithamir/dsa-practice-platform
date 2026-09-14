@@ -137,8 +137,12 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
     - Verified against the committed reference solutions, not toy code: `two-sum/solutions/reference.py` is Accepted on all 5 tests, including the 50,000-element hidden one at ~150 ms.
     - Verified the failure paths end to end too: wrong output → `WrongAnswer`, an exception → `RuntimeError` carrying Python's traceback, an infinite loop → `TimeLimitExceeded`, and the brute-force O(n²) Two Sum → `TimeLimitExceeded` on exactly the large hidden test the content ships to reject it.
     - The tests read the Judge's **shipped** `appsettings.json`, so a broken runner configuration fails a test rather than only production.
-13. **C# runner** — separate compile and run steps, each with its own limits; benchmark `dotnet run app.cs` (.NET 10 file-based apps) against invoking `csc` directly, keep the faster.
-    *Learn:* compilation cost, image-size trade-offs, cold vs warm starts.
+13. **C# runner** — compiled once per submission, then run per test case.
+    - **`dotnet run main.cs` doesn't work in the sandbox**: file-based apps still restore from NuGet, and the sandbox has no network (it fails after ~18s). Roslyn is invoked directly instead — fully offline, ~530 ms to compile, ~25 ms to run.
+    - **Compile is its own step with its own limits** (1 GB memory, 30s), writing to a per-submission volume the run containers mount **read-only** — so a program cannot rewrite what runs for the next test case. The volume is removed with the submission.
+    - The compile container is the one place anything runs as root, because a Docker volume is created root-owned. It has no network, no capabilities and a read-only root, and it runs the compiler, not the submission. **Submitted code only ever *runs* as nobody.**
+    - Global usings mirror the SDK's implicit usings, so submitted code looks like normal C#.
+    - Verified end to end: a hash-map Two Sum in C# is Accepted on all 5 tests (~140 ms each).
 14. **Sandbox hardening + escape test suite** — `--network none`, read-only rootfs + small tmpfs, `cap-drop ALL`, `no-new-privileges`, pids limit, non-root user, default seccomp profile; the Judge reaches Docker through a restricted socket proxy instead of the raw, root-equivalent `docker.sock`; evaluate gVisor (`runsc`). Integration tests submit hostile code: fork bomb, infinite loop, 10 GB allocation, outbound network call, writes outside `/tmp`, output flood.
     *Learn:* Linux isolation primitives, defense in depth, threat modelling — a strong interview topic.
 

@@ -37,7 +37,13 @@ public sealed class SandboxOptions
     /// <summary>How long to wait for an image pull before giving up.</summary>
     public int ImagePullTimeoutSeconds { get; init; } = 300;
 
-    /// <summary>Language key (as submitted) to how it is run. Empty until item 12 adds Python.</summary>
+    /// <summary>Memory for a compile step, which needs far more than the program it produces.</summary>
+    public int CompileMemoryMb { get; init; } = 1024;
+
+    /// <summary>Ceiling on a compile step. Compiling is not the submitter's time limit.</summary>
+    public int CompileTimeoutMs { get; init; } = 30_000;
+
+    /// <summary>Language key (as submitted) to how it is run.</summary>
     public Dictionary<string, LanguageRunner> Runners { get; init; } = [];
 }
 
@@ -58,4 +64,21 @@ public sealed class LanguageRunner
     /// a native-speed solution in mind, so an interpreter needs more of it for the same algorithm.
     /// </summary>
     public double TimeLimitMultiplier { get; init; } = 1.0;
+
+    /// <summary>
+    /// Image the compile step runs in, when the language has one. Usually a full SDK, while
+    /// <see cref="Image"/> is the much smaller runtime the compiled program actually needs.
+    /// </summary>
+    public string? CompileImage { get; init; }
+
+    /// <summary>
+    /// Compile command, or null for an interpreted language. It writes its artifacts to
+    /// <see cref="ArtifactPath"/>, which the run containers then mount read-only.
+    /// </summary>
+    public string[]? CompileCommand { get; init; }
+
+    /// <summary>Where compiled artifacts are written and later mounted.</summary>
+    public string ArtifactPath { get; init; } = "/out";
+
+    public bool IsCompiled => CompileCommand is { Length: > 0 } && CompileImage is not null;
 }
