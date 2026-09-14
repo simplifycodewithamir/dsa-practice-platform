@@ -40,35 +40,62 @@ public sealed class DockerSandboxExecutor(
 
         await EnsureImageAsync(runner.Image, cancellationToken);
 
-        var outcomes = new List<TestCaseOutcome>(request.TestCases.Count);
-
-        foreach (var testCase in request.TestCases.OrderBy(tc => tc.Ordinal))
+        // Compiled languages compile once per submission into a volume the run containers mount
+        // read-only; compiling per test case would pay the compiler's cost five times over.
+        string? artifactVolume = null;
+        try
         {
-            var outcome = await RunTestCaseAsync(request, runner, testCase, cancellationToken);
-            outcomes.Add(outcome);
-
-            // The verdict is decided by the first failure, so the remaining cases cannot change it
-            // -- and running them would spend sandbox time on an answer we already have.
-            if (outcome.Status != TestCaseStatus.Passed)
+            if (runner.IsCompiled)
             {
-                break;
+                await EnsureImageAsync(runner.CompileImage!, cancellationToken);
+
+                var compilation = await CompileAsync(request, runner, cancellationToken);
+                if (!compilation.Succeeded)
+                {
+                    return new ExecutionOutcome([], compilation.Output, CompilationFailed: true);
+                }
+
+                artifactVolume = compilation.VolumeName;
+            }
+
+            var outcomes = new List<TestCaseOutcome>(request.TestCases.Count);
+
+            foreach (var testCase in request.TestCases.OrderBy(tc => tc.Ordinal))
+            {
+                var outcome = await RunTestCaseAsync(request, runner, testCase, artifactVolume, cancellationToken);
+                outcomes.Add(outcome);
+
+                // The verdict is decided by the first failure, so the remaining cases cannot change
+                // it, and running them would spend sandbox time on an answer we already have.
+                if (outcome.Status != TestCaseStatus.Passed)
+                {
+                    break;
+                }
+            }
+
+            return new ExecutionOutcome(outcomes);
+        }
+        finally
+        {
+            if (artifactVolume is not null)
+            {
+                await RemoveVolumeAsync(artifactVolume);
             }
         }
-
-        return new ExecutionOutcome(outcomes);
     }
 
     private async Task<TestCaseOutcome> RunTestCaseAsync(
         SubmissionJudgeRequested request,
         LanguageRunner runner,
         JudgeTestCase testCase,
+        string? artifactVolume,
         CancellationToken cancellationToken)
     {
         var sandbox = options.Value;
         var timeLimit = TimeSpan.FromMilliseconds(request.TimeLimitMs * runner.TimeLimitMultiplier);
         var wallClockLimit = timeLimit + TimeSpan.FromMilliseconds(sandbox.StartupGraceMs);
 
-        var containerId = await CreateContainerAsync(request, runner, cancellationToken);
+        var containerId = await CreateContainerAsync(request, runner, artifactVolume, cancellationToken);
 
         try
         {
@@ -138,16 +165,23 @@ public sealed class DockerSandboxExecutor(
         }
     }
 
-    private async Task<string> CreateContainerAsync(SubmissionJudgeRequested request, LanguageRunner runner, CancellationToken cancellationToken)
+    private async Task<string> CreateContainerAsync(
+        SubmissionJudgeRequested request,
+        LanguageRunner runner,
+        string? artifactVolume,
+        CancellationToken cancellationToken)
     {
         var sandbox = options.Value;
         var memoryBytes = (long)request.MemoryLimitMb * 1024 * 1024;
+        var sourceEnvironmentValue = string.Empty;
 
         var created = await docker.Containers.CreateContainerAsync(
             new CreateContainerParameters
             {
                 Image = runner.Image,
-                Cmd = BuildCommand(runner, request.SourceCode, out var sourceEnvironmentValue),
+                Cmd = artifactVolume is null
+                    ? BuildCommand(runner, request.SourceCode, out sourceEnvironmentValue)
+                    : [.. runner.RunCommand],
                 WorkingDir = "/work",
                 // Never root, even inside a locked-down container.
                 User = "65534:65534",
@@ -157,7 +191,9 @@ public sealed class DockerSandboxExecutor(
                 OpenStdin = true,
                 StdinOnce = true,
                 NetworkDisabled = true,
-                Env = ["HOME=/work", $"{SourceEnvironmentVariable}={sourceEnvironmentValue}"],
+                Env = artifactVolume is null
+                    ? ["HOME=/work", $"{SourceEnvironmentVariable}={sourceEnvironmentValue}"]
+                    : ["HOME=/work"],
                 HostConfig = new HostConfig
                 {
                     // No network at all: submitted code cannot call home, mine, or reach the host.
@@ -179,6 +215,11 @@ public sealed class DockerSandboxExecutor(
                     },
                     CapDrop = ["ALL"],
                     SecurityOpt = ["no-new-privileges"],
+                    // Compiled artifacts, read-only: the program can run what was compiled and
+                    // cannot rewrite it between test cases.
+                    Mounts = artifactVolume is null
+                        ? []
+                        : [new Mount { Type = "volume", Source = artifactVolume, Target = runner.ArtifactPath, ReadOnly = true }],
                     AutoRemove = false // removed explicitly, so a failure to start can still be inspected
                 }
             },
@@ -192,6 +233,115 @@ public sealed class DockerSandboxExecutor(
     }
 
     /// <summary>
+    /// Compiles the submission once into a per-submission volume that the run containers then
+    /// mount read-only.
+    ///
+    /// The compile container runs as root, unlike every run container: a Docker volume is created
+    /// root-owned, so nothing else could write the artifacts into it. The trade-off is deliberate
+    /// and narrow -- it has no network, no capabilities and a read-only root filesystem, and it
+    /// runs a compiler, not the submission. The submission only ever *runs* as nobody.
+    /// </summary>
+    private async Task<CompilationResult> CompileAsync(
+        SubmissionJudgeRequested request,
+        LanguageRunner runner,
+        CancellationToken cancellationToken)
+    {
+        var sandbox = options.Value;
+        var volumeName = $"dsa-judge-{request.SubmissionId:N}";
+
+        await docker.Volumes.CreateAsync(new VolumesCreateParameters { Name = volumeName }, cancellationToken);
+
+        var command = BuildCommand(runner, request.SourceCode, out var sourceEnvironmentValue, runner.CompileCommand!);
+        var memoryBytes = (long)sandbox.CompileMemoryMb * 1024 * 1024;
+
+        var created = await docker.Containers.CreateContainerAsync(
+            new CreateContainerParameters
+            {
+                Image = runner.CompileImage!,
+                Cmd = command,
+                WorkingDir = "/work",
+                AttachStdout = true,
+                AttachStderr = true,
+                NetworkDisabled = true,
+                Env = ["HOME=/work", "DOTNET_CLI_TELEMETRY_OPTOUT=1", "DOTNET_NOLOGO=1", $"{SourceEnvironmentVariable}={sourceEnvironmentValue}"],
+                HostConfig = new HostConfig
+                {
+                    NetworkMode = "none",
+                    Memory = memoryBytes,
+                    MemorySwap = memoryBytes,
+                    NanoCPUs = (long)(sandbox.CpuCores * 1_000_000_000),
+                    PidsLimit = sandbox.PidsLimit,
+                    ReadonlyRootfs = true,
+                    Tmpfs = new Dictionary<string, string>
+                    {
+                        ["/work"] = "rw,exec,nosuid,mode=1777,size=256m",
+                        ["/tmp"] = "rw,exec,nosuid,mode=1777,size=256m"
+                    },
+                    CapDrop = ["ALL"],
+                    SecurityOpt = ["no-new-privileges"],
+                    Mounts = [new Mount { Type = "volume", Source = volumeName, Target = runner.ArtifactPath, ReadOnly = false }]
+                }
+            },
+            cancellationToken);
+
+        try
+        {
+            using var attach = await docker.Containers.AttachContainerAsync(
+                created.ID,
+                new ContainerAttachParameters { Stream = true, Stdout = true, Stderr = true },
+                cancellationToken);
+
+            await docker.Containers.StartContainerAsync(created.ID, new ContainerStartParameters(), cancellationToken);
+
+            using var compileTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            compileTimeout.CancelAfter(TimeSpan.FromMilliseconds(sandbox.CompileTimeoutMs));
+
+            string stdout;
+            string stderr;
+            try
+            {
+                (stdout, stderr) = await attach.ReadOutputToEndAsync(compileTimeout.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                logger.LogWarning("Compiling submission {SubmissionId} exceeded {Timeout} ms.", request.SubmissionId, sandbox.CompileTimeoutMs);
+                await RemoveVolumeAsync(volumeName);
+                return new CompilationResult(false, null, "Compilation timed out.");
+            }
+
+            var wait = await docker.Containers.WaitContainerAsync(created.ID, cancellationToken);
+
+            if (wait.StatusCode == 0)
+            {
+                return new CompilationResult(true, volumeName, Cap(string.Concat(stdout, stderr)));
+            }
+
+            // The compiler's own diagnostics are what the submitter needs to see.
+            logger.LogInformation("Submission {SubmissionId} failed to compile.", request.SubmissionId);
+            await RemoveVolumeAsync(volumeName);
+            return new CompilationResult(false, null, Cap(string.Concat(stdout, stderr)));
+        }
+        finally
+        {
+            await RemoveContainerAsync(created.ID);
+        }
+    }
+
+    private async Task RemoveVolumeAsync(string volumeName)
+    {
+        try
+        {
+            await docker.Volumes.RemoveAsync(volumeName, force: true, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Failed to remove artifact volume {VolumeName}.", volumeName);
+        }
+    }
+
+    private sealed record CompilationResult(bool Succeeded, string? VolumeName, string? Output);
+
+    /// <summary>
     /// The source is handed over as a base64 environment variable and written by the container into
     /// its own tmpfs, rather than copied in with the archive API.
     ///
@@ -203,7 +353,11 @@ public sealed class DockerSandboxExecutor(
     /// base64 so that no quoting, newline or non-UTF8 byte in the submission can break out of the
     /// shell command.
     /// </summary>
-    private static string[] BuildCommand(LanguageRunner runner, string sourceCode, out string sourceEnvironmentValue)
+    private static string[] BuildCommand(
+        LanguageRunner runner,
+        string sourceCode,
+        out string sourceEnvironmentValue,
+        string[]? command = null)
     {
         sourceEnvironmentValue = Convert.ToBase64String(Encoding.UTF8.GetBytes(sourceCode));
 
@@ -215,7 +369,7 @@ public sealed class DockerSandboxExecutor(
                 $"Submitted source is too large to run ({sourceEnvironmentValue.Length} bytes encoded).");
         }
 
-        var runCommand = string.Join(' ', runner.RunCommand.Select(Quote));
+        var runCommand = string.Join(' ', (command ?? runner.RunCommand).Select(Quote));
 
         return
         [
