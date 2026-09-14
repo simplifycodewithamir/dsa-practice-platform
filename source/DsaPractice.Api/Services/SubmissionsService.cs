@@ -3,6 +3,7 @@ using DsaPractice.DataAccess;
 using DsaPractice.DataAccess.Entities;
 using DsaPractice.Api.Endpoints;
 using DsaPractice.Api.Exceptions;
+using DsaPractice.Api.Messaging;
 using Microsoft.EntityFrameworkCore;
 
 namespace DsaPractice.Api.Services;
@@ -14,19 +15,20 @@ internal interface ISubmissionsService
     Task<SubmissionResponse> GetSubmissionByIdAsync(Guid id, CancellationToken cancellationToken);
 }
 
-internal sealed class SubmissionsService(DsaPracticeDbContext db, TimeProvider timeProvider) : ISubmissionsService
+internal sealed class SubmissionsService(
+    DsaPracticeDbContext db,
+    TimeProvider timeProvider,
+    IJudgeRequestPublisher judgeRequestPublisher) : ISubmissionsService
 {
     public async Task<SubmissionResponse> CreateSubmissionAsync(CreateSubmissionRequest request, CancellationToken cancellationToken)
     {
         // Business rule: a submission can only be created against a question that actually exists.
-        var questionExists = await db.Questions
+        // Test cases come along because the judge request carries them (decision D7).
+        var question = await db.Questions
             .AsNoTracking()
-            .AnyAsync(q => q.Id == request.QuestionId, cancellationToken);
-
-        if (!questionExists)
-        {
-            throw new NotFoundException($"Question '{request.QuestionId}' was not found.");
-        }
+            .Include(q => q.TestCases)
+            .FirstOrDefaultAsync(q => q.Id == request.QuestionId, cancellationToken)
+            ?? throw new NotFoundException($"Question '{request.QuestionId}' was not found.");
 
         var submission = new Submission
         {
@@ -41,6 +43,13 @@ internal sealed class SubmissionsService(DsaPracticeDbContext db, TimeProvider t
 
         db.Submissions.Add(submission);
         await db.SaveChangesAsync(cancellationToken);
+
+        // Deliberately naive: the row is committed, then the message is published, as two separate
+        // operations. If the process dies in between -- or the broker is unreachable -- the
+        // submission sits Pending forever with nothing queued to judge it, and the caller sees a
+        // 500 for a submission that was in fact saved. That gap is the dual-write problem, and
+        // item 8 closes it with a transactional outbox. Left visible on purpose.
+        await judgeRequestPublisher.PublishAsync(JudgeRequestFactory.Create(submission, question), cancellationToken);
 
         return SubmissionResponse.FromEntity(submission);
     }

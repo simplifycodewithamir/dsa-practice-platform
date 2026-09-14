@@ -65,6 +65,13 @@ Free DSA question-practice platform, deployed for students. MVP-scoped, sequence
    - **Idempotent:** re-running against unchanged content writes nothing. Edits update in place, keeping question and test-case ids, because submissions and their per-test results point at them. A question in the database but absent from content is left alone, never deleted.
    - Ordinals are assigned by the loader (samples first, then hidden), so authors never hand-number test cases across two folders and collide on the unique index.
    - **The `migrator` is now a small console app** rather than a `dotnet ef database update` invocation: it applies migrations, then seeds, in one transaction-safe shot. Its image dropped from the SDK to the runtime, and no design-time tooling ships to a deployment. `dotnet ef migrations add` on the host is unchanged.
+7. **Publish `SubmissionJudgeRequested`** (D5, D7) — creating a submission now publishes a judge request to RabbitMQ.
+   - **Topology:** durable direct exchange `dsa.submissions` → durable queue `submission.judge-requested`, bound on the routing key of the same name. Declared (idempotently) when the Api opens its connection, so a publish never races an undeclared queue; the Judge will declare the same topology in item 9.
+   - **Self-contained message** (D7): code, language, per-question limits, and *every* test case including hidden ones — the Judge never reads the Api's database. Hiding test cases is a read-API rule, not a judging one.
+   - **Publisher confirms** (`CreateChannelOptions(publisherConfirmationsEnabled: true)`) plus persistent delivery and `mandatory: true`: the publish call completes only once the broker has taken responsibility, and throws if the message is nacked or unroutable. Without confirms, a dropped message looks like success.
+   - **Connection opened lazily**, not at startup — a broker outage shouldn't stop an Api that still serves questions fine. One connection per process, a channel per publish.
+   - **The dual-write gap is deliberate and left visible:** the row is committed, *then* the message is published. With the broker stopped, `POST /submissions` returns 500 while the submission sits `Pending` with nothing queued to judge it (verified, not theorised). Item 8 closes this with a transactional outbox.
+   - **One observation for later:** a message carrying Two Sum's large hidden test is ~290 KB. Fine for RabbitMQ now; revisit if test data grows (D7 notes the cap).
    - **Local DB note:** the item 5 migration requires an empty `Questions` table (a new slug/limits column has no meaningful default). If yours holds old demo rows, the migrator fails with `column "Tags" of relation "Questions" contains null values` (rolled back, nothing half-applied). Either delete just those rows (`delete from "Submissions"; delete from "TestCases"; delete from "Questions";` in psql), or wipe everything local with `docker compose --profile full-stack down -v` (deletes the Postgres + RabbitMQ volumes).
 
 ## Roadmap — work top to bottom; a merged item moves up to "Already DONE"
@@ -95,8 +102,6 @@ Not final — revisit any row whose *why* stops holding.
 ### Phase 1 — Core judging loop (local, backend only)
 The heart of the product. Submissions keep a client-supplied `userId` until Phase 3 — acceptable only because nothing is deployed yet.
 
-7. **Publish `SubmissionJudgeRequested`** (D5, D7) — declare exchange/queue topology, publisher confirms; contract gains test cases and limits. Deliberately naive "save, then publish".
-   *Learn:* the AMQP model (exchange, queue, binding, routing key), durability, publisher confirms.
 8. **Transactional outbox** (D6) — close item 7's dual-write gap: the outbox row is written in the same DB transaction as the submission; a `BackgroundService` relays it to RabbitMQ.
    *Learn:* the dual-write problem, at-least-once delivery, why every consumer must be idempotent.
 9. **Judge consumer with a fake executor** — manual ack, prefetch, idempotency check, retry + dead-letter queue; a `FakeSandboxExecutor` returns canned verdicts and publishes `SubmissionJudged`.
@@ -150,12 +155,23 @@ A free code-execution service is an obvious target for crypto-mining and abuse �
 
 ## Local dev
 ```bash
-cp .env.example .env                    # one-time: local Postgres creds for docker-compose (gitignored)
+cp .env.example .env                    # one-time: local Postgres + RabbitMQ creds for docker-compose (gitignored)
+
+# NOTE if you already had a RabbitMQ volume from before item 7: the broker only creates the
+# configured user when its data directory is first initialised, and the built-in "guest" user
+# can't connect from another container. Drop the old volume once (it holds no data worth
+# keeping): docker compose --profile full-stack down && docker volume rm dsa-practice-platform_rabbitmqdata
 
 # one-time: local Postgres connection string, kept out of source control via dotnet user-secrets
 # (shared UserSecretsId between DsaPractice.Api and the migrations project — set once, both see it)
 dotnet user-secrets set "ConnectionStrings:DsaPractice" \
   "Host=localhost;Port=5432;Database=dsapractice;Username=dsapractice;Password=<your .env password>" \
+  --project source/DsaPractice.Api
+
+# one-time: broker URI, also kept out of source control (it carries credentials).
+# Use the RABBITMQ_USER/RABBITMQ_PASSWORD you put in .env.
+dotnet user-secrets set "RabbitMq:Uri" \
+  "amqp://dsapractice:<your .env password>@localhost:5672" \
   --project source/DsaPractice.Api
 
 docker compose up -d    # Postgres + RabbitMQ, and a one-shot "migrator" that applies pending
