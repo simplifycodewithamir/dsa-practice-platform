@@ -21,6 +21,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The Python runner tests assert against the configuration the Judge actually ships. -->
+    <None Include="..\..\source\DsaPractice.Judge\appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\source\DsaPractice.Judge\DsaPractice.Judge.csproj" />
   </ItemGroup>
 
