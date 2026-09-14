@@ -3,6 +3,7 @@ using DsaPractice.Api.Configuration;
 using DsaPractice.DataAccess;
 using DsaPractice.Api.Endpoints;
 using DsaPractice.Api.Exceptions;
+using DsaPractice.Api.Messaging;
 using DsaPractice.Api.Services;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
@@ -51,10 +52,21 @@ builder.Services.AddOptions<SubmissionsOptions>()
     .Validate(o => o.SupportedLanguages.Length > 0, "Submissions:SupportedLanguages must list at least one language.")
     .ValidateOnStart();
 
+builder.Services.AddOptions<RabbitMqOptions>()
+    .Bind(builder.Configuration.GetSection(RabbitMqOptions.SectionName))
+    .Validate(o => Uri.TryCreate(o.Uri, UriKind.Absolute, out _), "RabbitMq:Uri must be an absolute amqp:// URI.")
+    .Validate(o => !string.IsNullOrWhiteSpace(o.Exchange), "RabbitMq:Exchange is required.")
+    .Validate(o => !string.IsNullOrWhiteSpace(o.JudgeRequestedQueue), "RabbitMq:JudgeRequestedQueue is required.")
+    .ValidateOnStart();
+
+// One connection per process (opened on first publish), channels per publish.
+builder.Services.AddSingleton<IRabbitMqConnection, RabbitMqConnection>();
+builder.Services.AddSingleton<IJudgeRequestPublisher, JudgeRequestPublisher>();
+
 builder.Services.AddScoped<IQuestionsService, QuestionsService>();
 builder.Services.AddScoped<ISubmissionsService, SubmissionsService>();
 
-// TODO: register RabbitMQ publisher, FeatureManagement, OpenTelemetry
+// TODO: register FeatureManagement, OpenTelemetry
 
 var app = builder.Build();
 
