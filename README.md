@@ -156,7 +156,10 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
     - Submission polling **stops** once a submission is `Completed` (D11) rather than polling forever.
     - CORS on the Api from `Cors:AllowedOrigins`, empty by default so nothing cross-origin is allowed unless named; in dev the Vite proxy means the browser sees one origin and never asks.
     - **No Node on this machine**, so `frontend/README.md` documents running the toolchain through a `node:22-alpine` container. CI uses `setup-node` normally.
-16. **Question list + question page** — filter by difficulty/tag, rendered markdown statement, sample tests; question pages prerendered at build time.
+16. **Question list + question page** — the list filters by difficulty and topic (in the browser: the whole bank is a few dozen rows), and each question renders its markdown statement, its limits and its sample tests.
+    - Failures are reported as failures: an empty list would read as "no questions exist", and a 404 gets its own message rather than a generic error.
+    - `react-markdown` without `rehype-raw`, so a statement cannot inject markup.
+    - **Prerendering moved to item 30**, where the rest of SEO lives — it needs React Router's framework mode, which is a restructure rather than a page change.
 17. **Editor, submit, verdict** — Monaco, language picker, submit, poll until a final verdict, per-test-case results (hidden tests show pass/fail only).
 18. **Playwright E2E suite** — browse → open → submit → verdict, run in CI. A permanent suite, separate from the ad-hoc PR-demo recorder in the `git-workflow` skill.
 
