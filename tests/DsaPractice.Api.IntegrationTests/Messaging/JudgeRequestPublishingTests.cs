@@ -8,6 +8,7 @@ using DsaPractice.DataAccess;
 using DsaPractice.DataAccess.Entities;
 using Microsoft.Extensions.DependencyInjection;
 using RabbitMQ.Client;
+using RabbitMQ.Client.Exceptions;
 using Xunit;
 
 namespace DsaPractice.Api.IntegrationTests.Messaging;
@@ -103,19 +104,39 @@ public class JudgeRequestPublishingTests(ApiWebApplicationFactory factory)
         throw new InvalidOperationException($"No judge request was published for submission '{submissionId}'.");
     }
 
+    /// <summary>
+    /// Empties the queue, tolerating it not existing yet: the Api declares the topology when it
+    /// opens its connection, which is on its first publish, so before any submission in this run
+    /// there may be no queue at all. Tests must not depend on another test having published first.
+    /// </summary>
     private async Task PurgeQueueAsync()
     {
         await using var channel = await factory.RabbitMqConnection.CreateChannelAsync(cancellationToken: TestContext.Current.CancellationToken);
-        await channel.QueuePurgeAsync(ApiWebApplicationFactory.JudgeRequestQueue, TestContext.Current.CancellationToken);
+        try
+        {
+            await channel.QueuePurgeAsync(ApiWebApplicationFactory.JudgeRequestQueue, TestContext.Current.CancellationToken);
+        }
+        catch (OperationInterruptedException exception) when (exception.ShutdownReason?.ReplyCode == Constants.NotFound)
+        {
+            // Nothing published yet in this run, so nothing to purge.
+        }
     }
 
     private async Task<BasicGetResult?> TryGetAnyMessageAsync()
     {
+        // A failed BasicGet takes the channel down with it, so each attempt gets its own.
         await using var channel = await factory.RabbitMqConnection.CreateChannelAsync(cancellationToken: TestContext.Current.CancellationToken);
-        return await channel.BasicGetAsync(
-            ApiWebApplicationFactory.JudgeRequestQueue,
-            autoAck: true,
-            cancellationToken: TestContext.Current.CancellationToken);
+        try
+        {
+            return await channel.BasicGetAsync(
+                ApiWebApplicationFactory.JudgeRequestQueue,
+                autoAck: true,
+                cancellationToken: TestContext.Current.CancellationToken);
+        }
+        catch (OperationInterruptedException exception) when (exception.ShutdownReason?.ReplyCode == Constants.NotFound)
+        {
+            return null;
+        }
     }
 
     private async Task<Question> SeedQuestionWithTestCasesAsync()
