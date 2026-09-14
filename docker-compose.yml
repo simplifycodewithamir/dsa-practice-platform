@@ -76,6 +76,38 @@ services:
       migrator:
         condition: service_completed_successfully
 
+  # The Judge needs the Docker API to create sandboxes, but the raw socket is root-equivalent on
+  # the host: anything holding it can start a privileged container and own the machine. This proxy
+  # exposes only the endpoints the Judge actually uses, so a compromised Judge cannot, for example,
+  # bind-mount the host filesystem into a new container.
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    profiles: ["full-stack"]
+    environment:
+      CONTAINERS: 1   # create, start, attach, wait, inspect, remove sandboxes
+      IMAGES: 1       # pull and list runner images
+      VOLUMES: 1      # per-submission artifact volumes for compiled languages
+      POST: 1         # without this the proxy is read-only and nothing can be created
+      EXEC: 0         # no exec into existing containers
+      NETWORKS: 0
+      SERVICES: 0
+      SWARM: 0
+      SYSTEM: 0
+      SECRETS: 0
+      CONFIGS: 0
+      NODES: 0
+      TASKS: 0
+      PLUGINS: 0
+      INFO: 0
+      AUTH: 0
+      BUILD: 0
+      COMMIT: 0
+      DISTRIBUTION: 0
+      SESSION: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
   judge:
     profiles: ["full-stack"]
     build:
@@ -84,12 +116,13 @@ services:
     environment:
       DOTNET_ENVIRONMENT: Development
       RabbitMq__Uri: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672"
+      # Talks to the proxy, never to the socket itself.
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
     depends_on:
       rabbitmq:
         condition: service_healthy
-    volumes:
-      # required so the Judge service can spin up sandbox containers on the host
-      - /var/run/docker.sock:/var/run/docker.sock
+      docker-socket-proxy:
+        condition: service_started
 
 volumes:
   pgdata:

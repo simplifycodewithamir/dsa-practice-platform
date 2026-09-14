@@ -37,6 +37,23 @@ public sealed class SandboxOptions
     /// <summary>How long to wait for an image pull before giving up.</summary>
     public int ImagePullTimeoutSeconds { get; init; } = 300;
 
+    /// <summary>
+    /// Container runtime for sandbox containers, e.g. "runsc" for gVisor. Null uses the daemon's
+    /// default (runc). gVisor puts a user-space kernel between submitted code and the host kernel,
+    /// which is the strongest available answer to a kernel exploit -- see docs/sandbox-hardening.md.
+    /// </summary>
+    public string? Runtime { get; init; }
+
+    /// <summary>
+    /// seccomp profile. "default" means the daemon's own profile, which already blocks the
+    /// syscalls a container has no business making; nothing is sent in that case, because the
+    /// Engine API expects a JSON profile here rather than the CLI's "default" shorthand.
+    ///
+    /// Anything else is passed through verbatim, so a custom JSON profile can be supplied -- or
+    /// "unconfined", which must never be used for submitted code.
+    /// </summary>
+    public string SeccompProfile { get; init; } = "default";
+
     /// <summary>Memory for a compile step, which needs far more than the program it produces.</summary>
     public int CompileMemoryMb { get; init; } = 1024;
 
