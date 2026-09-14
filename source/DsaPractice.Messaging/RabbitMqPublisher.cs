@@ -1,9 +1,10 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 
-namespace DsaPractice.Api.Messaging;
+namespace DsaPractice.Messaging;
 
-internal interface IMessagePublisher
+public interface IMessagePublisher
 {
     /// <summary>Publishes an already-serialized message, returning only once the broker confirms it.</summary>
     Task PublishAsync(string routingKey, string type, string messageId, ReadOnlyMemory<byte> body, CancellationToken cancellationToken);
@@ -13,7 +14,7 @@ internal interface IMessagePublisher
 /// Deliberately knows nothing about message types: the outbox row carries the routing key, type
 /// and body, and this just gets it to the broker.
 /// </summary>
-internal sealed class RabbitMqPublisher(
+public sealed class RabbitMqPublisher(
     IRabbitMqConnection connection,
     IOptions<RabbitMqOptions> options,
     ILogger<RabbitMqPublisher> logger) : IMessagePublisher

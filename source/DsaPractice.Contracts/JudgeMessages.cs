@@ -24,14 +24,32 @@ public sealed record JudgeTestCase(
     string Input,
     string ExpectedOutput);
 
-// Published by Judge -> RabbitMQ ("submission.judged"), consumed by Api
+// Published by Judge -> RabbitMQ ("submission.judged"), consumed by Api.
 public sealed record SubmissionJudged(
     Guid SubmissionId,
-    string Verdict, // Passed | Failed | Error | TimeLimitExceeded | MemoryLimitExceeded
-    IReadOnlyList<TestCaseResult> TestCaseResults);
+    JudgeVerdict Verdict,
+    IReadOnlyList<TestCaseResult> TestCaseResults,
+    string? CompileOutput = null);
+
+/// <summary>
+/// Outcome of a judged submission. Mirrors the Api's SubmissionVerdict by name rather than sharing
+/// the type: the Judge must not reference the Api's data access, and a wire contract that changes
+/// only when the contract changes is the point of a separate assembly.
+/// </summary>
+public enum JudgeVerdict
+{
+    Accepted,
+    WrongAnswer,
+    TimeLimitExceeded,
+    MemoryLimitExceeded,
+    RuntimeError,
+    CompilationError,
+    InternalError
+}
 
 public sealed record TestCaseResult(
     Guid TestCaseId,
+    int Ordinal,
     bool Passed,
     string? ActualOutput,
     string? ErrorMessage,
