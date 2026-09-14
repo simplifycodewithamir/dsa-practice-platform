@@ -22,6 +22,13 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
       - name: Restore
         run: dotnet restore source/DsaPractice.slnx
 
@@ -33,6 +40,14 @@ jobs:
           dotnet test --project tests/DsaPractice.Api.UnitTests/DsaPractice.Api.UnitTests.csproj --configuration Release --no-build --verbosity normal
           dotnet test --project tests/DsaPractice.ContentSeeding.UnitTests/DsaPractice.ContentSeeding.UnitTests.csproj --configuration Release --no-build --verbosity normal
           dotnet test --project tests/DsaPractice.Judge.UnitTests/DsaPractice.Judge.UnitTests.csproj --configuration Release --no-build --verbosity normal
+
+      - name: Frontend build and tests
+        run: |
+          npm ci
+          npm run lint
+          npm test
+          npm run build
+        working-directory: frontend
 
       - name: Integration tests
         run: |
