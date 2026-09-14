@@ -89,7 +89,7 @@ public class JudgeRequestFactoryTests
     {
         Id = Guid.NewGuid(),
         QuestionId = questionId,
-        UserId = "user-1",
+        OwnerUserId = Guid.NewGuid(),
         Language = "python",
         SourceCode = "print(1)",
         SubmittedAtUtc = DateTimeOffset.UnixEpoch

@@ -21,6 +21,8 @@ namespace DsaPractice.Api.IntegrationTests.Messaging;
 [Collection(ApiTestCollection.Name)]
 public class JudgedResultTests(ApiWebApplicationFactory factory)
 {
+    private const string OwnerSubject = "judged-result-tests-owner";
+
     [Fact]
     public async Task RecordAsync_AcceptedResult_CompletesTheSubmissionWithItsTestResults()
     {
@@ -126,6 +128,8 @@ public class JudgedResultTests(ApiWebApplicationFactory factory)
             ]));
 
         using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", TestTokens.For(OwnerSubject));
         using var response = await client.GetAsync($"/api/v1/submissions/{submissionId}", TestContext.Current.CancellationToken);
         var body = await response.Content.ReadFromJsonAsync<SubmissionResponse>(TestJson.Options, TestContext.Current.CancellationToken);
 
@@ -158,7 +162,10 @@ public class JudgedResultTests(ApiWebApplicationFactory factory)
             .SingleAsync(s => s.Id == submissionId, TestContext.Current.CancellationToken);
     }
 
-    /// <summary>A pending submission against a question with one sample and one hidden test case.</summary>
+    /// <summary>
+    /// A pending submission against a question with one sample and one hidden test case, owned by
+    /// a user the caller can authenticate as (reads are owner-or-admin since item 19).
+    /// </summary>
     private async Task<(Guid SubmissionId, List<Guid> TestCaseIds)> SeedSubmissionAsync()
     {
         var question = TestData.NewQuestion();
@@ -169,11 +176,12 @@ public class JudgedResultTests(ApiWebApplicationFactory factory)
         ];
         await TestData.SeedAsync(factory, question);
 
+        var owner = await TestData.SeedUserAsync(factory, OwnerSubject);
         var submission = new Submission
         {
             Id = Guid.NewGuid(),
             QuestionId = question.Id,
-            UserId = "user-1",
+            OwnerUserId = owner.Id,
             Language = "python",
             SourceCode = "print(1)",
             SubmittedAtUtc = DateTimeOffset.UtcNow
