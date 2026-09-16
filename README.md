@@ -23,7 +23,10 @@ Free DSA question-practice platform, deployed for students. MVP-scoped, sequence
 │   ├── DsaPractice.ContentSeeding.IntegrationTests/
 │   └── DsaPractice.Judge.UnitTests/
 ├── content/questions/<slug>/             # authored questions — see "Authoring a question"
-├── docs/                                 # learning notes (e.g. dsa-containers-design.md)
+├── docs/
+│   ├── design/                           # HLD, LLD, architecture, use cases, sequence,
+│   │                                     #   class, ER and module-interaction diagrams
+│   └── *.md                              # learning notes (e.g. dsa-containers-design.md)
 ├── frontend/                             # React + TypeScript (not yet scaffolded)
 ├── .github/workflows/dotnet.yml
 └── docker-compose.yml                    # Postgres + RabbitMQ + migrator (+ api/judge under `full-stack`)
@@ -339,6 +342,24 @@ Prerequisites: the one-time `user-secrets`/`.env` setup above, and `docker compo
 - Both configs are independent — running one doesn't start the other. To exercise the full
   submission flow end to end you'd eventually run both, same as the two `dotnet run` commands
   above.
+
+## Design documentation
+
+`docs/design/` holds the full set, all diagrams in Mermaid so GitHub renders them inline:
+
+| Document | Answers |
+|---|---|
+| [High-level design](docs/design/01-high-level-design.md) | What the system is, what it guarantees, and the shape that follows |
+| [Architecture and deployment](docs/design/02-architecture.md) | Which processes exist, what runs where, messaging topology, CI |
+| [Use cases](docs/design/03-use-cases.md) | Actors and what each can do, with the rules per use case |
+| [Sequence diagrams](docs/design/04-sequence-diagrams.md) | Every flow in order — including broker outages and redeliveries |
+| [Class diagrams](docs/design/05-class-diagrams.md) | The types in each module and how they collaborate |
+| [Data model](docs/design/06-data-model.md) | ER diagram, constraints, indexes, migrations, retention |
+| [Module interaction](docs/design/07-module-interaction.md) | The assembly graph and the dependency rules it enforces |
+| [Low-level design](docs/design/08-low-level-design.md) | Outbox relay, sandbox pipeline, verdict rules, error mapping |
+
+Start with the [index](docs/design/README.md). Read the low-level design before changing the outbox
+or the sandbox.
 
 ## Conventions
 Follows the user's standard `dotnet-production-code`, `dotnet-testing`, `react-frontend`, `git-workflow` skills, plus the project-specific `dsa-practice-platform` skill for the Judge architecture and MVP scope boundaries. Read the project skill before extending scope past v1 (more languages, leaderboard, etc.) — it's intentionally capped for now.
