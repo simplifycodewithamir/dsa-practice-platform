@@ -177,20 +177,22 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
     - Reading someone else's submission returns **404, not 403** — 403 would confirm the id exists.
     - **No token-minting code in the Api** (D4): it is configured entirely from `Authentication:Schemes:Bearer`, which is what `dotnet user-jwts` writes locally and where an identity provider's settings slot in at item 20. Tests mint their own tokens with a test-only key.
     - **Enforcement is off** (`Auth:RequireAuthentication`) until item 20 gives the browser somewhere to get a token; submissions made without one belong to a single local-development user, so the foreign key still holds. Everything else — validating a token that is present, provisioning, owner-or-admin reads — is already in effect.
-19a. **Per-question starter code** — done out of sequence, ahead of item 20: writing the `Main` and the
-    stdin parsing by hand was the first thing every solver hit, and the compile errors it produced
-    were in boilerplate rather than in anyone's algorithm.
-    - `content/questions/<slug>/starters/<language>.<ext>` — the filename's stem is the language id,
-      the extension only exists so an editor highlights the file. Optional: a question with none
-      falls back to the generic "read from stdin, print the answer" comment.
-    - **D8 is not reversed.** Judging is still stdin/stdout; the skeleton just writes the I/O for you
-      and leaves one method. LeetCode-style signatures stay a v2 candidate (item 35).
-    - Stored as a `jsonb` map on `Questions`, the same call as `Tags` → `text[]`: a small map always
-      read with its question and never queried by language on its own doesn't earn a child table.
-      Serialised by an explicit EF converter rather than Npgsql's `EnableDynamicJson()`, which would
-      otherwise have to be remembered by every host that builds a data source — Api, migrator, tests.
-    - `tools/check-starters.sh` builds every starter with the Judge's own runner images and compile
-      command, read out of its `appsettings.json`. A starter that doesn't compile is worse than none.
+**19a. Per-question starter code** — done out of sequence, ahead of item 20: writing the `Main` and
+the stdin parsing by hand was the first thing every solver hit, and the compile errors it produced
+were in boilerplate rather than in anyone's algorithm.
+
+- `content/questions/<slug>/starters/<language>.<ext>` — the filename's stem is the language id,
+  the extension only exists so an editor highlights the file. Optional: a question with none falls
+  back to the generic "read from stdin, print the answer" comment.
+- **D8 is not reversed.** Judging is still stdin/stdout; the skeleton just writes the I/O for you
+  and leaves one method. LeetCode-style signatures stay a v2 candidate (item 35).
+- Stored as a `jsonb` map on `Questions`, the same call as `Tags` → `text[]`: a small map always
+  read with its question and never queried by language on its own doesn't earn a child table.
+  Serialised by an explicit EF converter rather than Npgsql's `EnableDynamicJson()`, which would
+  otherwise have to be remembered by every host that builds a data source — Api, migrator, tests.
+- `tools/check-starters.sh` builds every starter with the Judge's own runner images and compile
+  command, read out of its `appsettings.json`. A starter that doesn't compile is worse than none.
+
 20. **Real IdP + SPA login** — choose the IdP after a fresh free-tier check (Microsoft Entra External ID, Auth0, Clerk, self-hosted Keycloak); Google + GitHub login first; the Api validates via `Authority` (JWKS, RS256); the SPA uses Authorization Code + PKCE with the access token held in memory. A BFF (tokens server-side, HttpOnly cookie) is the stricter option — revisit after launch.
     *Learn:* OIDC flows, PKCE, JWKS and key rotation, token lifetimes.
 21. **My account** — my submission history; delete my account (local data + the IdP user).
