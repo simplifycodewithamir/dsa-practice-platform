@@ -139,6 +139,98 @@ public class QuestionSeederTests(PostgresFixture fixture)
         Assert.Null(await FindAsync(good.Slug));
     }
 
+    [Fact]
+    public async Task SeedAsync_NewQuestion_RoundTripsStartersThroughTheJsonbColumn()
+    {
+        var starters = new Dictionary<string, string>
+        {
+            ["csharp"] = "public class Solution\n{\n    // \"quoted\", \\ escaped\n}\n",
+            ["python"] = "def solve():\n    pass\n"
+        };
+        var content = NewContent(fixture.UniqueSlug()) with { Starters = starters };
+
+        await SeedAsync(content);
+
+        // Serialised by the configured converter, not by Npgsql's dynamic JSON: the point of the
+        // assertion is that code with quotes and backslashes survives the round trip verbatim.
+        var saved = await LoadAsync(content.Slug);
+        Assert.Equal(starters, saved.Starters);
+    }
+
+    [Fact]
+    public async Task SeedAsync_UnchangedStarters_DoesNotReportTheQuestionAsUpdated()
+    {
+        var content = NewContent(fixture.UniqueSlug()) with
+        {
+            Starters = new Dictionary<string, string> { ["csharp"] = "// a", ["python"] = "# b" }
+        };
+        await SeedAsync(content);
+
+        // Same pairs, different insertion order -- a jsonb map is unordered, so this is the same
+        // content and must not rewrite the row.
+        var result = await SeedAsync(content with
+        {
+            Starters = new Dictionary<string, string> { ["python"] = "# b", ["csharp"] = "// a" }
+        });
+
+        Assert.Equal(0, result.Updated);
+        Assert.Equal(1, result.Unchanged);
+    }
+
+    [Fact]
+    public async Task SeedAsync_EditedStarter_UpdatesInPlaceKeepingTheQuestionId()
+    {
+        var content = NewContent(fixture.UniqueSlug()) with
+        {
+            Starters = new Dictionary<string, string> { ["python"] = "# before\n" }
+        };
+        await SeedAsync(content);
+        var originalId = (await LoadAsync(content.Slug)).Id;
+
+        var result = await SeedAsync(content with
+        {
+            Starters = new Dictionary<string, string> { ["python"] = "# after\n" }
+        });
+
+        Assert.Equal(1, result.Updated);
+        var saved = await LoadAsync(content.Slug);
+        Assert.Equal(originalId, saved.Id);
+        Assert.Equal("# after\n", saved.Starters["python"]);
+    }
+
+    [Fact]
+    public async Task SeedAsync_StarterRemovedFromContent_IsRemovedFromTheQuestion()
+    {
+        var content = NewContent(fixture.UniqueSlug()) with
+        {
+            Starters = new Dictionary<string, string> { ["csharp"] = "// a", ["python"] = "# b" }
+        };
+        await SeedAsync(content);
+
+        var result = await SeedAsync(content with
+        {
+            Starters = new Dictionary<string, string> { ["python"] = "# b" }
+        });
+
+        Assert.Equal(1, result.Updated);
+        var saved = await LoadAsync(content.Slug);
+        Assert.Equal(["python"], saved.Starters.Keys);
+    }
+
+    [Fact]
+    public async Task SeedAsync_QuestionWithNoStarters_StoresAnEmptyMapRatherThanNull()
+    {
+        var content = NewContent(fixture.UniqueSlug()) with
+        {
+            Starters = new Dictionary<string, string>()
+        };
+
+        await SeedAsync(content);
+
+        var saved = await LoadAsync(content.Slug);
+        Assert.Empty(saved.Starters);
+    }
+
     private Task<SeedResult> SeedAsync(QuestionContent content) => SeedAsync([content]);
 
     private async Task<SeedResult> SeedAsync(IReadOnlyList<QuestionContent> content)
@@ -168,6 +260,7 @@ public class QuestionSeederTests(PostgresFixture fixture)
         TimeLimitMs: 1000,
         MemoryLimitMb: 256,
         Statement: "A statement.",
+        Starters: new Dictionary<string, string> { ["python"] = "# your code here\n" },
         TestCases:
         [
             new TestCaseContent(1, "4 9", "0 1", IsHidden: false),

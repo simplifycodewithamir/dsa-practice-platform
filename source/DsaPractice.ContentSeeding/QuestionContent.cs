@@ -11,6 +11,7 @@ public sealed record QuestionContent(
     int TimeLimitMs,
     int MemoryLimitMb,
     string Statement,
+    IReadOnlyDictionary<string, string> Starters,
     IReadOnlyList<TestCaseContent> TestCases);
 
 public sealed record TestCaseContent(int Ordinal, string Input, string ExpectedOutput, bool IsHidden);

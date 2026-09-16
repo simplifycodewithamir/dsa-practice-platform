@@ -11,6 +11,7 @@ namespace DsaPractice.ContentSeeding;
 /// <code>
 /// content/questions/&lt;slug&gt;/question.json        metadata
 /// content/questions/&lt;slug&gt;/statement.md         markdown problem statement
+/// content/questions/&lt;slug&gt;/starters/&lt;language&gt;.ext  editor skeleton, optional
 /// content/questions/&lt;slug&gt;/tests/sample/NN.in   shown to the user
 /// content/questions/&lt;slug&gt;/tests/hidden/NN.in   judged against, never returned by the Api
 /// </code>
@@ -26,6 +27,9 @@ public static class ContentLoader
     };
 
     private static readonly Regex SlugRegex = new(Question.SlugPattern, RegexOptions.Compiled);
+
+    // A starter file's stem is a language id, which is a bare lowercase token -- no hyphens, unlike a slug.
+    private static readonly Regex LanguageRegex = new("^[a-z0-9]+$", RegexOptions.Compiled);
 
     public static IReadOnlyList<QuestionContent> Load(string contentRoot)
     {
@@ -70,6 +74,7 @@ public static class ContentLoader
 
         var metadata = LoadMetadata(directory, slug, problems);
         var statement = LoadStatement(directory, slug, problems);
+        var starters = LoadStarters(directory, slug, problems);
         var testCases = LoadTestCases(directory, slug, problems);
 
         if (problems.Count > problemsBefore || metadata is null || statement is null)
@@ -85,6 +90,7 @@ public static class ContentLoader
             metadata.TimeLimitMs,
             metadata.MemoryLimitMb,
             statement,
+            starters,
             testCases);
     }
 
@@ -164,6 +170,54 @@ public static class ContentLoader
         return statement;
     }
 
+    /// <summary>
+    /// Reads starters/&lt;language&gt;.&lt;ext&gt;. The file's stem is the language id ("csharp", "python");
+    /// the extension only exists so an editor highlights the file while it's being authored, and is
+    /// ignored here. Deliberately not checked against Submissions:SupportedLanguages -- that list is
+    /// the Api's, and a second copy of it in the seeder would be a second thing to keep in step. A
+    /// starter for a language nothing offers is dead weight, not a broken question.
+    /// </summary>
+    private static Dictionary<string, string> LoadStarters(string directory, string slug, List<string> problems)
+    {
+        var starters = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        var startersDirectory = Path.Combine(directory, "starters");
+        if (!Directory.Exists(startersDirectory))
+        {
+            return starters;
+        }
+
+        foreach (var path in Directory.EnumerateFiles(startersDirectory).OrderBy(p => p, StringComparer.Ordinal))
+        {
+            var language = Path.GetFileNameWithoutExtension(path);
+
+            if (!LanguageRegex.IsMatch(language))
+            {
+                problems.Add($"{slug}: starters/{Path.GetFileName(path)} is not named after a language (lowercase letters and digits, e.g. 'csharp.cs').");
+                continue;
+            }
+
+            // Two files with the same stem ("csharp.cs" and "csharp.txt") would otherwise have the
+            // winner decided by enumeration order -- silently, and differently per filesystem.
+            if (starters.ContainsKey(language))
+            {
+                problems.Add($"{slug}: more than one starter is named '{language}' (the extension is ignored, so the stems must be unique).");
+                continue;
+            }
+
+            var code = NormaliseSource(File.ReadAllText(path));
+            if (code.Trim().Length == 0)
+            {
+                problems.Add($"{slug}: starters/{Path.GetFileName(path)} is empty.");
+                continue;
+            }
+
+            starters[language] = code;
+        }
+
+        return starters;
+    }
+
     private static List<TestCaseContent> LoadTestCases(string directory, string slug, List<string> problems)
     {
         var testCases = new List<TestCaseContent>();
@@ -207,6 +261,13 @@ public static class ContentLoader
     /// same file on Linux, and an editor's trailing newline isn't part of the expected output.
     /// </summary>
     private static string Normalise(string text) => text.ReplaceLineEndings("\n").TrimEnd('\n');
+
+    /// <summary>
+    /// Same CRLF fix as <see cref="Normalise"/>, but source code keeps exactly one trailing newline:
+    /// it is opened in an editor rather than compared byte for byte, and a file that ends mid-line
+    /// leaves the caret somewhere odd.
+    /// </summary>
+    private static string NormaliseSource(string text) => $"{Normalise(text)}\n";
 
     private sealed class QuestionMetadata
     {

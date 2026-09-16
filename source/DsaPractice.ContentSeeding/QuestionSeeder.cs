@@ -99,7 +99,8 @@ public sealed class QuestionSeeder(DsaPracticeDbContext db, ILogger<QuestionSeed
             Difficulty = content.Difficulty,
             Tags = [.. content.Tags],
             TimeLimitMs = content.TimeLimitMs,
-            MemoryLimitMb = content.MemoryLimitMb
+            MemoryLimitMb = content.MemoryLimitMb,
+            Starters = new Dictionary<string, string>(content.Starters, StringComparer.Ordinal)
         };
 
         question.TestCases =
@@ -132,7 +133,19 @@ public sealed class QuestionSeeder(DsaPracticeDbContext db, ILogger<QuestionSeed
         {
             question.Tags = [.. content.Tags];
         }
+
+        // Same reason, and order-insensitive: a jsonb map that round-trips with its keys in a
+        // different order is the same starter set, and rewriting it would report every question as
+        // updated on every run.
+        if (!StartersMatch(question.Starters, content.Starters))
+        {
+            question.Starters = new Dictionary<string, string>(content.Starters, StringComparer.Ordinal);
+        }
     }
+
+    private static bool StartersMatch(Dictionary<string, string> existing, IReadOnlyDictionary<string, string> authored) =>
+        existing.Count == authored.Count
+        && authored.All(pair => existing.TryGetValue(pair.Key, out var code) && code == pair.Value);
 
     private int ReconcileTestCases(QuestionContent content, Question question)
     {

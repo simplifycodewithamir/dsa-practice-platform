@@ -21,6 +21,7 @@ internal sealed record QuestionDetailResponse(
     IReadOnlyList<string> Tags,
     int TimeLimitMs,
     int MemoryLimitMb,
+    IReadOnlyDictionary<string, string> Starters,
     IReadOnlyList<TestCaseResponse> SampleTestCases)
 {
     // Maps whatever TestCases were loaded -- the caller decides which ones (never hidden ones).
@@ -33,5 +34,6 @@ internal sealed record QuestionDetailResponse(
         question.Tags,
         question.TimeLimitMs,
         question.MemoryLimitMb,
+        question.Starters,
         question.TestCases.Select(tc => new TestCaseResponse(tc.Id, tc.Ordinal, tc.Input, tc.ExpectedOutput)).ToList());
 }

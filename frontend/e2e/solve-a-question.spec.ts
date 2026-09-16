@@ -46,6 +46,20 @@ test('a student can browse to a question and see it', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Example 1' })).toBeVisible();
 });
 
+test("the editor opens with the question's starter, not an empty page", async ({ page }) => {
+  await page.goto('/problems/two-sum');
+
+  // Authored in content/questions/two-sum/starters/python.py: the stdin parsing is already
+  // written, so a solver fills in one method instead of rediscovering the input format.
+  const editor = page.locator('.monaco-editor .view-lines');
+  await expect(editor).toContainText('two_sum');
+  await expect(editor).toContainText('Your code here');
+
+  // Switching language swaps the skeleton, because nothing has been typed yet.
+  await page.getByLabel('Language').selectOption('csharp');
+  await expect(editor).toContainText('TwoSum');
+});
+
 test('a correct solution is accepted, with every test case reported', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('/problems/two-sum');

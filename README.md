@@ -100,7 +100,7 @@ Not final — revisit any row whose *why* stops holding.
 | D5 | **`RabbitMQ.Client` directly**, no MassTransit | You learn the real primitives (exchanges, acks, prefetch, dead-lettering, publisher confirms). MassTransit v9+ is also commercially licensed. |
 | D6 | **Transactional outbox** for Api → RabbitMQ | Saving a submission and publishing its message touch two systems. Without an outbox, a crash between the two loses the message (submission stuck `Pending` forever) or the retry duplicates it. |
 | D7 | Judge messages carry everything needed to judge: code, language, test cases, limits | The Judge never touches the Api's database — a clean service boundary. Cap message size; only move test data to object storage if it ever outgrows that. |
-| D8 | **stdin/stdout judging** (Codeforces-style), not LeetCode-style function signatures | Language-agnostic: a new language is a new runner image, not per-question driver code for every language. Revisit in v2 if the UX calls for it. |
+| D8 | **stdin/stdout judging** (Codeforces-style), not LeetCode-style function signatures | Language-agnostic: a new language is a new runner image, not per-question driver code for every language. Revisit in v2 if the UX calls for it. **Refined by item 19a**, not reversed: per-question starter code writes the I/O boilerplate for the solver, which is what the UX cost of this decision actually was. Note for the v2 revisit — LeetCode does *not* need per-question driver code either; one generic signature-driven driver per language covers it, so the rationale above is an argument for starters, not against signatures. |
 | D9 | Questions as **content-as-code** — files under `content/questions/<slug>/`, idempotently upserted by the `migrator` container — not EF data migrations | Fixing a typo in a statement shouldn't need a schema migration. Content gets reviewed in PRs like code, and scales past 30 questions without pain. |
 | D10 | Frontend: **Vite + React + TypeScript + React Router v7 + TanStack Query + Tailwind + Monaco**; public pages **prerendered at build time**; static hosting on Cloudflare Pages | Organic traffic and AdSense both depend on Google indexing real HTML. Build-time prerendering gets that without running a Node SSR server. |
 | D11 | Verdicts reach the browser by **polling** first; SSE only if needed | Simplest thing that works — a judge run takes seconds either way. |
@@ -177,6 +177,20 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
     - Reading someone else's submission returns **404, not 403** — 403 would confirm the id exists.
     - **No token-minting code in the Api** (D4): it is configured entirely from `Authentication:Schemes:Bearer`, which is what `dotnet user-jwts` writes locally and where an identity provider's settings slot in at item 20. Tests mint their own tokens with a test-only key.
     - **Enforcement is off** (`Auth:RequireAuthentication`) until item 20 gives the browser somewhere to get a token; submissions made without one belong to a single local-development user, so the foreign key still holds. Everything else — validating a token that is present, provisioning, owner-or-admin reads — is already in effect.
+19a. **Per-question starter code** — done out of sequence, ahead of item 20: writing the `Main` and the
+    stdin parsing by hand was the first thing every solver hit, and the compile errors it produced
+    were in boilerplate rather than in anyone's algorithm.
+    - `content/questions/<slug>/starters/<language>.<ext>` — the filename's stem is the language id,
+      the extension only exists so an editor highlights the file. Optional: a question with none
+      falls back to the generic "read from stdin, print the answer" comment.
+    - **D8 is not reversed.** Judging is still stdin/stdout; the skeleton just writes the I/O for you
+      and leaves one method. LeetCode-style signatures stay a v2 candidate (item 35).
+    - Stored as a `jsonb` map on `Questions`, the same call as `Tags` → `text[]`: a small map always
+      read with its question and never queried by language on its own doesn't earn a child table.
+      Serialised by an explicit EF converter rather than Npgsql's `EnableDynamicJson()`, which would
+      otherwise have to be remembered by every host that builds a data source — Api, migrator, tests.
+    - `tools/check-starters.sh` builds every starter with the Judge's own runner images and compile
+      command, read out of its `appsettings.json`. A starter that doesn't compile is worse than none.
 20. **Real IdP + SPA login** — choose the IdP after a fresh free-tier check (Microsoft Entra External ID, Auth0, Clerk, self-hosted Keycloak); Google + GitHub login first; the Api validates via `Authority` (JWKS, RS256); the SPA uses Authorization Code + PKCE with the access token held in memory. A BFF (tokens server-side, HttpOnly cookie) is the stricter option — revisit after launch.
     *Learn:* OIDC flows, PKCE, JWKS and key rotation, token lifetimes.
 21. **My account** — my submission history; delete my account (local data + the IdP user).
@@ -210,7 +224,7 @@ A free code-execution service is an obvious target for crypto-mining and abuse �
 32. **Content** — a written editorial for every question (the original content AdSense reviews), growing past 50 questions.
 33. **Analytics** — Cloudflare Web Analytics (free and cookieless, so no consent banner needed for it).
 34. **Google AdSense** — apply once content and traffic exist; `ads.txt`; Google-certified consent banner (required for EEA/UK/Swiss visitors); ads on list and editorial pages only, **never** on the editor/judge page.
-35. **v2 candidates** — only once v1 has real users: progress tracking and streaks, more languages (Java, C++, JavaScript), leaderboard, SSE live verdicts, an admin UI for authoring questions, runtime/memory stats, BFF auth.
+35. **v2 candidates** — only once v1 has real users: progress tracking and streaks, more languages (Java, C++, JavaScript), leaderboard, SSE live verdicts, an admin UI for authoring questions, runtime/memory stats, BFF auth, and **LeetCode-style function signatures** (a signature block in `question.json`, one generic reflection-driven driver per language, test cases as typed JSON — see D8 and item 19a).
 
 ## Local dev
 ```bash
@@ -260,6 +274,9 @@ with the slug that becomes its URL (`/problems/two-sum`):
 content/questions/two-sum/
 ├── question.json            # title, difficulty (Easy|Medium|Hard), tags, timeLimitMs, memoryLimitMb
 ├── statement.md             # markdown problem statement
+├── starters/
+│   ├── csharp.cs            # what the editor opens with, per language -- optional
+│   └── python.py
 ├── tests/
 │   ├── sample/01.in 01.out  # shown to the user via GET /api/v1/questions/{slug}
 │   └── hidden/01.in 01.out  # judged against, never returned by the Api
@@ -271,6 +288,30 @@ Then apply it:
 ```bash
 docker compose run --rm migrator          # upserts by slug; unchanged content writes nothing
 ```
+
+### Starter code
+
+Judging is stdin/stdout (D8), so without a starter every solver rewrites the same parsing loop
+before getting to the algorithm — and gets their compile errors from the boilerplate rather than
+from their own idea. Each question therefore ships a skeleton per language with the I/O already
+written and one method left to fill in.
+
+- **The filename's stem is the language id** (`csharp.cs` → `"csharp"`, matching
+  `Submissions:SupportedLanguages`). The extension is only so an editor highlights the file while
+  you write it; the loader ignores it.
+- **The folder is optional.** A question with no starter for the language the solver picked opens
+  with a generic "read from stdin, print the answer" comment instead.
+- **Keep starters compiling.** One that doesn't build is worse than none — the first thing a solver
+  sees is an error they didn't cause. `tools/check-starters.sh` builds every starter with the same
+  runner images and compile command the Judge uses (it reads them out of the Judge's
+  `appsettings.json`, so the check can't drift from the sandbox):
+  ```bash
+  tools/check-starters.sh            # every question
+  tools/check-starters.sh two-sum    # just one
+  ```
+- The sandbox injects `global using` for `System`, `System.Collections.Generic`, `System.IO`,
+  `System.Linq`, `System.Text`, `System.Threading` and `System.Threading.Tasks`, so a C# starter
+  needs no `using` lines of its own.
 
 Notes:
 - **Ordinals are assigned by the loader** — samples first, then hidden, each in filename order. Don't

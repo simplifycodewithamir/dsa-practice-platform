@@ -204,6 +204,87 @@ public sealed class ContentLoaderTests : IDisposable
         Assert.Single(question.TestCases);
     }
 
+    [Fact]
+    public void Load_StartersFolder_KeysByFileStemAndIgnoresTheExtension()
+    {
+        WriteQuestion("two-sum");
+        WriteStarters("two-sum", ("csharp.cs", "// C#"), ("python.py", "# Python"));
+
+        var question = Assert.Single(ContentLoader.Load(_root));
+
+        Assert.Equal(["csharp", "python"], question.Starters.Keys.Order());
+        Assert.Equal("// C#\n", question.Starters["csharp"]);
+        Assert.Equal("# Python\n", question.Starters["python"]);
+    }
+
+    [Fact]
+    public void Load_NoStartersFolder_LeavesStartersEmptyRatherThanFailing()
+    {
+        // A question authored before starters existed is still valid content.
+        WriteQuestion("two-sum");
+
+        var question = Assert.Single(ContentLoader.Load(_root));
+
+        Assert.Empty(question.Starters);
+    }
+
+    [Fact]
+    public void Load_StarterFile_NormalisesCrlfAndEndsWithExactlyOneNewline()
+    {
+        WriteQuestion("two-sum");
+        WriteStarters("two-sum", ("csharp.cs", "class A\r\n{\r\n}\r\n\r\n\r\n"));
+
+        var question = Assert.Single(ContentLoader.Load(_root));
+
+        // CRLF from a Windows checkout would otherwise reach the editor, and a file that ends
+        // mid-line leaves the caret somewhere odd.
+        Assert.Equal("class A\n{\n}\n", question.Starters["csharp"]);
+    }
+
+    [Fact]
+    public void Load_StarterNamedAfterSomethingOtherThanALanguage_IsReported()
+    {
+        WriteQuestion("two-sum");
+        WriteStarters("two-sum", ("C-Sharp.cs", "// C#"));
+
+        var exception = Assert.Throws<ContentException>(() => ContentLoader.Load(_root));
+
+        Assert.Contains("starters/C-Sharp.cs is not named after a language", exception.Message);
+    }
+
+    [Fact]
+    public void Load_TwoStartersWithTheSameStem_IsReportedRatherThanDecidedByEnumerationOrder()
+    {
+        WriteQuestion("two-sum");
+        WriteStarters("two-sum", ("csharp.cs", "// first"), ("csharp.txt", "// second"));
+
+        var exception = Assert.Throws<ContentException>(() => ContentLoader.Load(_root));
+
+        Assert.Contains("more than one starter is named 'csharp'", exception.Message);
+    }
+
+    [Fact]
+    public void Load_EmptyStarterFile_IsReported()
+    {
+        WriteQuestion("two-sum");
+        WriteStarters("two-sum", ("python.py", "   \n\n"));
+
+        var exception = Assert.Throws<ContentException>(() => ContentLoader.Load(_root));
+
+        Assert.Contains("starters/python.py is empty", exception.Message);
+    }
+
+    private void WriteStarters(string slug, params (string FileName, string Code)[] starters)
+    {
+        var directory = Path.Combine(_root, "questions", slug, "starters");
+        Directory.CreateDirectory(directory);
+
+        foreach (var (fileName, code) in starters)
+        {
+            File.WriteAllText(Path.Combine(directory, fileName), code);
+        }
+    }
+
     private void WriteQuestion(
         string slug,
         (string Input, string Output)[]? samples = null,

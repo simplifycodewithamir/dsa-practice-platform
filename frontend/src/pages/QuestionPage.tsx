@@ -75,7 +75,9 @@ export default function QuestionPage() {
         </div>
       </section>
 
-      <SubmitPanel questionId={question.id!} />
+      {/* Keyed on the question: navigating to another problem must reset the editor to that
+          question's starter and drop the previous verdict, not keep this component's state. */}
+      <SubmitPanel key={question.id} questionId={question.id!} starters={question.starters} />
     </article>
   );
 }
