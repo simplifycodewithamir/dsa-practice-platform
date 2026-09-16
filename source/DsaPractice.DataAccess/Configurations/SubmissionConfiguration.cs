@@ -16,6 +16,7 @@ internal sealed class SubmissionConfiguration : IEntityTypeConfiguration<Submiss
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Property(s => s.Status).HasConversion<string>().HasMaxLength(20);
+        builder.Property(s => s.CompileOutput).HasMaxLength(SubmissionTestResult.MaxOutputLength);
         builder.Property(s => s.Verdict).HasConversion<string>().HasMaxLength(30);
 
         // Verdict is set exactly when the submission is Completed -- never a verdict on a

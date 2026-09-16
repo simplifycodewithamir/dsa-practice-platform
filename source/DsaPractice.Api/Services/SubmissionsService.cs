@@ -59,9 +59,33 @@ internal sealed class SubmissionsService(
     {
         var submission = await db.Submissions
             .AsNoTracking()
+            .Include(s => s.TestResults)
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken)
             ?? throw new NotFoundException($"Submission '{id}' was not found.");
 
-        return SubmissionResponse.FromEntity(submission);
+        // Which test cases are hidden lives on the question, not on the result, so the two are
+        // joined here rather than duplicating IsHidden onto every result row.
+        var hiddenTestCaseIds = await db.TestCases
+            .AsNoTracking()
+            .Where(tc => tc.QuestionId == submission.QuestionId && tc.IsHidden)
+            .Select(tc => tc.Id)
+            .ToListAsync(cancellationToken);
+
+        var results = submission.TestResults
+            .OrderBy(r => r.Ordinal)
+            .Select(r =>
+            {
+                var isHidden = hiddenTestCaseIds.Contains(r.TestCaseId);
+                return new SubmissionTestResultResponse(
+                    r.Ordinal,
+                    isHidden,
+                    r.Passed,
+                    r.ExecutionTimeMs,
+                    isHidden ? null : r.ActualOutput,
+                    isHidden ? null : r.ErrorMessage);
+            })
+            .ToList();
+
+        return SubmissionResponse.FromEntity(submission) with { TestResults = results };
     }
 }
