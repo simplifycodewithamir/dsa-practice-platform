@@ -34,7 +34,11 @@ public sealed class Submission
 {
     public Guid Id { get; set; }
     public Guid QuestionId { get; set; }
-    public required string UserId { get; set; }
+    /// <summary>
+    /// The local user this submission belongs to -- not the provider's subject, so switching
+    /// identity provider cannot orphan anyone's history (decision D3).
+    /// </summary>
+    public Guid OwnerUserId { get; set; }
     public required string Language { get; set; } // "csharp" | "python" for v1
     public required string SourceCode { get; set; }
     public SubmissionStatus Status { get; set; } = SubmissionStatus.Pending;

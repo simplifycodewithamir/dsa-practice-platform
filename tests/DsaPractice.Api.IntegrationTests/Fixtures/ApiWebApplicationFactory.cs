@@ -45,6 +45,16 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>, I
         builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["RabbitMq:Uri"] = _rabbitMq.GetConnectionString(),
+            // Same shape `dotnet user-jwts` writes for local development (decision D4), so the Api
+            // is configured here exactly as it is on a developer's machine.
+            ["Authentication:Schemes:Bearer:ValidIssuer"] = TestTokens.Issuer,
+            ["Authentication:Schemes:Bearer:ValidAudiences:0"] = TestTokens.Audience,
+            ["Authentication:Schemes:Bearer:SigningKeys:0:Id"] = "test",
+            // Issuer and Length are part of the shape the framework's configuration binder expects;
+            // without the Issuer it silently binds no keys at all and every token fails validation.
+            ["Authentication:Schemes:Bearer:SigningKeys:0:Issuer"] = TestTokens.Issuer,
+            ["Authentication:Schemes:Bearer:SigningKeys:0:Value"] = TestTokens.SigningKeyBase64,
+            ["Authentication:Schemes:Bearer:SigningKeys:0:Length"] = "32",
             // Tests drive OutboxProcessor directly so they assert what a relay pass does instead of
             // racing its timer. The loop around it is covered by starting the app at all.
             ["Outbox:RelayEnabled"] = "false"

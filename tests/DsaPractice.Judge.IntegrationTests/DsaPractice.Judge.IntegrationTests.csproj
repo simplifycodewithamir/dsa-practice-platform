@@ -16,7 +16,13 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Testcontainers.RabbitMq" />
+    <PackageReference Include="Docker.DotNet.Enhanced" />
     <PackageReference Include="RabbitMQ.Client" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The Python runner tests assert against the configuration the Judge actually ships. -->
+    <None Include="..\..\source\DsaPractice.Judge\appsettings.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

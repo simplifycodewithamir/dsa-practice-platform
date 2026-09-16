@@ -126,23 +126,59 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
     - Output is truncated to 4000 characters on the way in: submitted code decides that string's length, so the database must not.
     - A result for an unknown submission is acked and discarded (nothing to retry); a database failure is requeued.
     - Verified end to end on the running stack: submit → `Completed` with `"verdict": "Accepted"` and 5 results in about a second.
-11. **`ISandboxExecutor` via Docker.DotNet** — ephemeral container per run; CPU, memory, wall-clock and output-size limits (exact values proposed in the PR for review, per the project skill's hard rules); container always torn down, including on timeout and crash.
-    *Learn:* Docker Engine API, cgroups, OOM-kill detection, mapping exit codes to verdicts.
-12. **Python runner** — first real language: fastest startup, simplest image.
-13. **C# runner** — separate compile and run steps, each with its own limits; benchmark `dotnet run app.cs` (.NET 10 file-based apps) against invoking `csc` directly, keep the faster.
-    *Learn:* compilation cost, image-size trade-offs, cold vs warm starts.
-14. **Sandbox hardening + escape test suite** — `--network none`, read-only rootfs + small tmpfs, `cap-drop ALL`, `no-new-privileges`, pids limit, non-root user, default seccomp profile; the Judge reaches Docker through a restricted socket proxy instead of the raw, root-equivalent `docker.sock`; evaluate gVisor (`runsc`). Integration tests submit hostile code: fork bomb, infinite loop, 10 GB allocation, outbound network call, writes outside `/tmp`, output flood.
-    *Learn:* Linux isolation primitives, defense in depth, threat modelling — a strong interview topic.
+11. **`ISandboxExecutor` via Docker.DotNet** — one throwaway container per test case, never reused.
+    - **Limits, all configurable** (proposed for review per the project skill): 1 CPU, the question's own memory limit with swap disabled, 64 pids, the question's time limit plus a 3s startup grace before the kill, 64 KB of captured output, a 32 MB tmpfs.
+    - **Isolation:** no network at all, read-only root filesystem, every capability dropped, `no-new-privileges`, runs as `nobody`, writable space only in an in-memory tmpfs that dies with the container.
+    - **Source arrives as a base64 environment variable** the container writes itself. Docker refuses to copy into a read-only rootfs, and a bind mount would expose a host path to submitted code (and wouldn't resolve at all once the Judge runs in a container against the host daemon).
+    - **Timed by the container's own start/finish timestamps**, not the wall clock around the call: container startup costs hundreds of milliseconds and charging the submitter for the daemon's overhead fails correct solutions on a busy host. The wall clock still decides when to kill.
+    - **Stops at the first failing test case** — the verdict is already decided, so the rest is spent sandbox time.
+    - Switched to the maintained `Docker.DotNet.Enhanced` fork: Testcontainers already depends on it, and two packages producing `Docker.DotNet.dll` resolved to whichever NuGet picked.
+12. **Python runner** — real execution is on by default: `python:3.12-alpine`, `TimeLimitMultiplier` 2.0 (a question's limit is written with a native-speed solution in mind, so an interpreter needs more of it for the same algorithm).
+    - Verified against the committed reference solutions, not toy code: `two-sum/solutions/reference.py` is Accepted on all 5 tests, including the 50,000-element hidden one at ~150 ms.
+    - Verified the failure paths end to end too: wrong output → `WrongAnswer`, an exception → `RuntimeError` carrying Python's traceback, an infinite loop → `TimeLimitExceeded`, and the brute-force O(n²) Two Sum → `TimeLimitExceeded` on exactly the large hidden test the content ships to reject it.
+    - The tests read the Judge's **shipped** `appsettings.json`, so a broken runner configuration fails a test rather than only production.
+13. **C# runner** — compiled once per submission, then run per test case.
+    - **`dotnet run main.cs` doesn't work in the sandbox**: file-based apps still restore from NuGet, and the sandbox has no network (it fails after ~18s). Roslyn is invoked directly instead — fully offline, ~530 ms to compile, ~25 ms to run.
+    - **Compile is its own step with its own limits** (1 GB memory, 30s), writing to a per-submission volume the run containers mount **read-only** — so a program cannot rewrite what runs for the next test case. The volume is removed with the submission.
+    - The compile container is the one place anything runs as root, because a Docker volume is created root-owned. It has no network, no capabilities and a read-only root, and it runs the compiler, not the submission. **Submitted code only ever *runs* as nobody.**
+    - Global usings mirror the SDK's implicit usings, so submitted code looks like normal C#.
+    - Verified end to end: a hash-map Two Sum in C# is Accepted on all 5 tests (~140 ms each).
+
+14. **Sandbox hardening + escape test suite** — see `docs/sandbox-hardening.md` for the threat model and the full control list.
+    - **The Judge no longer holds the Docker socket.** It goes through `docker-socket-proxy`, which exposes only containers/images/volumes and refuses `exec`. The raw socket is root-equivalent on the host: anything holding it can start a privileged container with the host filesystem mounted.
+    - seccomp is explicit configuration now (the daemon's default profile; the Engine API wants a JSON profile, so "default" means "send nothing" rather than the CLI's shorthand).
+    - **gVisor hook**: `Judge:Sandbox:Runtime: "runsc"` is passed straight to the daemon. **Unverified** — gVisor can't be installed under Docker Desktop on WSL2. Turn it on and re-run the escape tests on the production VM (item 25).
+    - **`SandboxEscapeTests` (9)**: no Docker socket, no capabilities, `NoNewPrivs`, no other processes visible, no mounting, no writing to `/proc/sysrq-trigger`, no reading `/dev/sda`, the pids cap holds even after the program raises its own rlimits, and nothing survives the run.
 
 ### Phase 2 — Frontend (local)
-15. **Scaffold** (D10) — Vite + React + TS + React Router v7 + TanStack Query + Tailwind; typed API client generated from the Api's OpenAPI document; CORS on the Api for the dev origin.
-16. **Question list + question page** — filter by difficulty/tag, rendered markdown statement, sample tests; question pages prerendered at build time.
-17. **Editor, submit, verdict** — Monaco, language picker, submit, poll until a final verdict, per-test-case results (hidden tests show pass/fail only).
-18. **Playwright E2E suite** — browse → open → submit → verdict, run in CI. A permanent suite, separate from the ad-hoc PR-demo recorder in the `git-workflow` skill.
+15. **Scaffold** (D10) — Vite + React + TS + React Router v7 + TanStack Query + Tailwind v4, app shell and routing (`/`, `/problems/:slug`).
+    - **The API client is generated, not written**: `openapi-typescript` turns the Api's OpenAPI document into types, and every request/response type derives from it, so a contract change breaks the build rather than the page. Only possible because item 11 made the Api describe its responses.
+    - Submission polling **stops** once a submission is `Completed` (D11) rather than polling forever.
+    - CORS on the Api from `Cors:AllowedOrigins`, empty by default so nothing cross-origin is allowed unless named; in dev the Vite proxy means the browser sees one origin and never asks.
+    - **No Node on this machine**, so `frontend/README.md` documents running the toolchain through a `node:22-alpine` container. CI uses `setup-node` normally.
+16. **Question list + question page** — the list filters by difficulty and topic (in the browser: the whole bank is a few dozen rows), and each question renders its markdown statement, its limits and its sample tests.
+    - Failures are reported as failures: an empty list would read as "no questions exist", and a 404 gets its own message rather than a generic error.
+    - `react-markdown` without `rehype-raw`, so a statement cannot inject markup.
+    - **Prerendering moved to item 30**, where the rest of SEO lives — it needs React Router's framework mode, which is a restructure rather than a page change.
+17. **Editor, submit, verdict** — Monaco with a language picker, submit, and a verdict that appears on its own as polling settles.
+    - Verdicts are spelled out for a person ("Time limit exceeded", not `TimeLimitExceeded`), and a judge failure says it is not the submitter's fault.
+    - **Hidden test cases show pass/fail and a duration, never output** — the Api already withholds it, and the UI would not render it even if it arrived.
+    - Submitting is disabled while judging, so a second run cannot replace a result nobody has read yet; switching language keeps code the user actually wrote.
+    - **`userId` is a random id in localStorage** until items 19–19. **`Users` table + Api auth** (D3, D4) — identity now comes from the token, and submissions belong to a local user row.
+    - `Users(Id, Issuer, Subject, DisplayName, Role, CreatedAt)`, unique on `(Issuer, Subject)`, **provisioned on first sight** — no registration form, because the provider already did that part. `Submission` points at that row, so switching provider never orphans anyone's history.
+    - **`userId` is gone from the request.** Who submits is decided by the caller's identity; sending one changes nothing.
+    - **Roles live here, not in the token**: switching identity provider cannot change who is an admin.
+    - Reading someone else's submission returns **404, not 403** — 403 would confirm the id exists.
+    - **No token-minting code in the Api** (D4): it is configured entirely from `Authentication:Schemes:Bearer`, which is what `dotnet user-jwts` writes locally and where an identity provider's settings slot in at item 20. Tests mint their own tokens with a test-only key.
+    - **Enforcement is off** (`Auth:RequireAuthentication`) until item 20 gives the browser somewhere to get a token; submissions made without one belong to a single local-development user, so the foreign key still holds. Everything else — validating a token that is present, provisioning, owner-or-admin reads — is already in effect.
+20. It is not a login and proves nothing; the Api stops taking a client-supplied id in item 19.
+
+18. **Playwright E2E suite** — the whole product against itself, in a browser: browse, open a question, write in Monaco, submit, and get a verdict from a Judge that really ran the code in a container. Nothing stubbed.
+    - Covers the accepted path (with hidden cases reported as pass/fail), a wrong answer showing the student their own output, a crash reported as a runtime error rather than a wrong answer, and list filtering.
+    - Typing into Monaco goes through the clipboard: it auto-indents and auto-closes brackets, so typing Python character by character produces mangled code.
+    - Runs as its own CI job that builds the images and brings the stack up, with service logs and the Playwright report uploaded on failure.
 
 ### Phase 3 — Identity & accounts
-19. **`Users` table + Api auth** (D3, D4) — `Users(Id, Issuer, Subject, DisplayName, Role, CreatedAt)`, just-in-time provisioning on a user's first authenticated request; `Submission.UserId` becomes a `Guid` foreign key; PR #8's endpoint protection and ownership filter return; local tokens via `dotnet user-jwts`, integration tests sign tokens with a test-only key.
-    *Learn:* resource-server pattern, claims, `IClaimsTransformation`, resource-based authorization.
 20. **Real IdP + SPA login** — choose the IdP after a fresh free-tier check (Microsoft Entra External ID, Auth0, Clerk, self-hosted Keycloak); Google + GitHub login first; the Api validates via `Authority` (JWKS, RS256); the SPA uses Authorization Code + PKCE with the access token held in memory. A BFF (tokens server-side, HttpOnly cookie) is the stricter option — revisit after launch.
     *Learn:* OIDC flows, PKCE, JWKS and key rotation, token lifetimes.
 21. **My account** — my submission history; delete my account (local data + the IdP user).

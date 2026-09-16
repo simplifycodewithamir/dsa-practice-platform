@@ -142,6 +142,9 @@ namespace DsaPractice.DataMigrations.Postgres.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("QuestionId")
                         .HasColumnType("uuid");
 
@@ -157,15 +160,13 @@ namespace DsaPractice.DataMigrations.Postgres.Migrations
                     b.Property<DateTimeOffset>("SubmittedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("Verdict")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId");
 
                     b.HasIndex("QuestionId");
 
@@ -243,8 +244,50 @@ namespace DsaPractice.DataMigrations.Postgres.Migrations
                     b.ToTable("TestCases");
                 });
 
+            modelBuilder.Entity("DsaPractice.DataAccess.Entities.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Issuer")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Issuer", "Subject")
+                        .IsUnique();
+
+                    b.ToTable("Users");
+                });
+
             modelBuilder.Entity("DsaPractice.DataAccess.Entities.Submission", b =>
                 {
+                    b.HasOne("DsaPractice.DataAccess.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("DsaPractice.DataAccess.Entities.Question", null)
                         .WithMany()
                         .HasForeignKey("QuestionId")

@@ -1,10 +1,13 @@
 using DsaPractice.Messaging;
 using System.Text.Json.Serialization;
+using DsaPractice.Api.Auth;
 using DsaPractice.Api.Configuration;
 using DsaPractice.DataAccess;
 using DsaPractice.Api.Endpoints;
 using DsaPractice.Api.Exceptions;
 using DsaPractice.Api.Messaging;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Options;
 using DsaPractice.Api.Services;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
@@ -53,6 +56,22 @@ builder.Services.AddOptions<SubmissionsOptions>()
     .Validate(o => o.SupportedLanguages.Length > 0, "Submissions:SupportedLanguages must list at least one language.")
     .ValidateOnStart();
 
+builder.Services.AddOptions<AuthOptions>()
+    .Bind(builder.Configuration.GetSection(AuthOptions.SectionName))
+    .ValidateOnStart();
+
+// Resource-server only (decision D3): this validates tokens, it does not issue them. Everything
+// comes from configuration under Authentication:Schemes:Bearer, which is exactly what
+// `dotnet user-jwts` writes for local development (D4) and what an identity provider's
+// Authority/JWKS settings slot into at item 20 -- so there is no token-minting code here to
+// accidentally ship.
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
+builder.Services.AddAuthorization();
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserProvider, CurrentUserProvider>();
+builder.Services.AddScoped<SubmissionOwnershipFilter>();
+
 builder.Services.AddOptions<RabbitMqOptions>()
     .Bind(builder.Configuration.GetSection(RabbitMqOptions.SectionName))
     .Validate(o => Uri.TryCreate(o.Uri, UriKind.Absolute, out _), "RabbitMq:Uri must be an absolute amqp:// URI.")
@@ -81,6 +100,15 @@ builder.Services.AddHostedService<OutboxRelay>();
 builder.Services.AddScoped<JudgedResultRecorder>();
 builder.Services.AddHostedService<JudgedResultConsumer>();
 
+// The frontend is served from a different origin in production (Cloudflare Pages in front of an
+// api. subdomain, decision D2). Allowed origins are configuration, and an empty list means no
+// cross-origin caller is allowed at all -- locally the Vite dev server proxies /api instead, so
+// the browser sees one origin and never asks.
+builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
+    .WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [])
+    .WithMethods("GET", "POST")
+    .WithHeaders("content-type", "authorization")));
+
 builder.Services.AddScoped<IQuestionsService, QuestionsService>();
 builder.Services.AddScoped<ISubmissionsService, SubmissionsService>();
 
@@ -101,9 +129,23 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors();
+
+// Populates HttpContext.User from a bearer token when one is present, whether or not the endpoint
+// requires it -- which is what lets submissions be attributed before enforcement is switched on.
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapGroup("/api/v1/questions").MapQuestionsEndpoints();
-app.MapGroup("/api/v1/submissions").MapSubmissionsEndpoints();
+var submissions = app.MapGroup("/api/v1/submissions").MapSubmissionsEndpoints();
+
+// Off until item 20 gives the browser somewhere to get a token from; enforcing it now would only
+// mean nobody can submit. Everything else -- validating a token that is present, provisioning the
+// user, owner-or-admin on reads -- is already in effect.
+if (app.Services.GetRequiredService<IOptions<AuthOptions>>().Value.RequireAuthentication)
+{
+    submissions.RequireAuthorization();
+}
 
 app.MapGet("/health", () => TypedResults.Ok(new HealthResponse("ok")));
 

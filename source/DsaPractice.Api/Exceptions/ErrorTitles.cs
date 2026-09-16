@@ -12,5 +12,7 @@ internal static class ErrorTitles
     public const string NotFound = "notfound";
     public const string Conflict = "conflict";
     public const string MethodNotAllowed = "methodnotallowed";
+    public const string Unauthorized = "unauthorized";
+    public const string Forbidden = "forbidden";
     public const string Unknown = "unknown";
 }

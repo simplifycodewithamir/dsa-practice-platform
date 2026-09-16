@@ -1,3 +1,4 @@
+using DsaPractice.Api.Auth;
 using DsaPractice.Api.Exceptions;
 using DsaPractice.Api.Services;
 using FluentValidation;
@@ -12,10 +13,13 @@ internal static class SubmissionsEndpoints
         // The handlers' return types document the success responses; the failures are thrown as
         // ApiExceptions and turned into ProblemDetails by GlobalExceptionHandler, which the
         // OpenAPI document can't infer -- hence the explicit ProducesProblem calls.
+        // Reading a submission is always owner-or-admin; when authentication is not required the
+        // "owner" is the shared local user, so the rule holds either way.
         group.MapPost("/", CreateSubmission)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
         group.MapGet("/{id:guid}", GetSubmissionById)
+            .AddEndpointFilter<SubmissionOwnershipFilter>()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         return group;
