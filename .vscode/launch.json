@@ -32,6 +32,39 @@
       "env": {
         "DOTNET_ENVIRONMENT": "Development"
       }
+    },
+    {
+      // Migrations, then content. cwd is the repo root because the migrator resolves
+      // Content:Path ("content" by default) relative to the working directory.
+      "name": "DsaPractice.Migrator",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-migrator",
+      "program": "${workspaceFolder}/source/DataMigrations/DsaPractice.DataMigrations.Postgres/bin/Debug/net10.0/DsaPractice.DataMigrations.Postgres.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "console": "internalConsole",
+      "env": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    },
+    {
+      // Attaches to a running process: the Api or Judge started by `dotnet run`, or one
+      // already mid-run that you don't want to restart. Pick it from the list VS Code shows.
+      "name": "Attach to a .NET process",
+      "type": "coreclr",
+      "request": "attach"
+    }
+  ],
+  "compounds": [
+    {
+      // The full submission flow needs both halves. Breakpoints in either are hit, and
+      // stopping one stops the other.
+      "name": "Api + Judge",
+      "configurations": ["DsaPractice.Api", "DsaPractice.Judge"],
+      "stopAll": true,
+      "presentation": { "order": 1 }
     }
   ]
 }

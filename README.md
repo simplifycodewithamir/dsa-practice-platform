@@ -26,6 +26,7 @@ Free DSA question-practice platform, deployed for students. MVP-scoped, sequence
 ├── docs/
 │   ├── design/                           # HLD, LLD, architecture, use cases, sequence,
 │   │                                     #   class, ER and module-interaction diagrams
+│   ├── debugging.md                      # debugging in VS Code and Visual Studio
 │   └── *.md                              # learning notes (e.g. dsa-containers-design.md)
 ├── frontend/                             # React + TypeScript (not yet scaffolded)
 ├── .github/workflows/dotnet.yml
@@ -360,6 +361,8 @@ dotnet user-secrets set "ConnectionStrings:DsaPractice" \
 dotnet user-secrets set "RabbitMq:Uri" \
   "amqp://dsapractice:<your .env password>@localhost:5672" \
   --project source/DsaPractice.Api
+# DsaPractice.Judge shares the same UserSecretsId, so it reads this one too -- without it the
+# Judge fails startup validation, which is what made F5 on that project unusable.
 
 docker compose up -d    # Postgres + RabbitMQ, and a one-shot "migrator" that applies pending
                          # EF Core migrations, seeds content/questions/**, then exits -- no
@@ -450,9 +453,15 @@ Prerequisites: the one-time `user-secrets`/`.env` setup above, and `docker compo
   it with the debugger attached — breakpoints, step-through, the works.
 - For the Api, once you see `Now listening on: http://localhost:51942` in the Debug Console, VS
   Code opens `http://localhost:51942/scalar` automatically.
-- Both configs are independent — running one doesn't start the other. To exercise the full
-  submission flow end to end you'd eventually run both, same as the two `dotnet run` commands
-  above.
+- **Api + Judge** is a compound configuration: it launches both under the debugger in one keypress,
+  which is what the full submission flow needs. The individual configs still run one at a time.
+- **DsaPractice.Migrator** debugs the migrations and the content seeder; its working directory is the
+  repo root, because `Content:Path` resolves relative to it.
+- **Attach to a .NET process** attaches to something already running, e.g. started with `dotnet run`.
+
+See [docs/debugging.md](docs/debugging.md) for the full guide, including Visual Studio, breakpoints
+in the background services and consumers, and what to do about sandbox containers that are destroyed
+before you can look at them.
 
 ## Design documentation
 
