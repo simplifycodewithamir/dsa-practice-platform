@@ -143,8 +143,12 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
     - The compile container is the one place anything runs as root, because a Docker volume is created root-owned. It has no network, no capabilities and a read-only root, and it runs the compiler, not the submission. **Submitted code only ever *runs* as nobody.**
     - Global usings mirror the SDK's implicit usings, so submitted code looks like normal C#.
     - Verified end to end: a hash-map Two Sum in C# is Accepted on all 5 tests (~140 ms each).
-14. **Sandbox hardening + escape test suite** — `--network none`, read-only rootfs + small tmpfs, `cap-drop ALL`, `no-new-privileges`, pids limit, non-root user, default seccomp profile; the Judge reaches Docker through a restricted socket proxy instead of the raw, root-equivalent `docker.sock`; evaluate gVisor (`runsc`). Integration tests submit hostile code: fork bomb, infinite loop, 10 GB allocation, outbound network call, writes outside `/tmp`, output flood.
-    *Learn:* Linux isolation primitives, defense in depth, threat modelling — a strong interview topic.
+
+14. **Sandbox hardening + escape test suite** — see `docs/sandbox-hardening.md` for the threat model and the full control list.
+    - **The Judge no longer holds the Docker socket.** It goes through `docker-socket-proxy`, which exposes only containers/images/volumes and refuses `exec`. The raw socket is root-equivalent on the host: anything holding it can start a privileged container with the host filesystem mounted.
+    - seccomp is explicit configuration now (the daemon's default profile; the Engine API wants a JSON profile, so "default" means "send nothing" rather than the CLI's shorthand).
+    - **gVisor hook**: `Judge:Sandbox:Runtime: "runsc"` is passed straight to the daemon. **Unverified** — gVisor can't be installed under Docker Desktop on WSL2. Turn it on and re-run the escape tests on the production VM (item 25).
+    - **`SandboxEscapeTests` (9)**: no Docker socket, no capabilities, `NoNewPrivs`, no other processes visible, no mounting, no writing to `/proc/sysrq-trigger`, no reading `/dev/sda`, the pids cap holds even after the program raises its own rlimits, and nothing survives the run.
 
 ### Phase 2 — Frontend (local)
 15. **Scaffold** (D10) — Vite + React + TS + React Router v7 + TanStack Query + Tailwind; typed API client generated from the Api's OpenAPI document; CORS on the Api for the dev origin.

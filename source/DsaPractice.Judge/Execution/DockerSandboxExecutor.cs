@@ -214,7 +214,8 @@ public sealed class DockerSandboxExecutor(
                         ["/tmp"] = $"rw,noexec,nosuid,mode=1777,size={sandbox.WorkspaceSizeMb}m"
                     },
                     CapDrop = ["ALL"],
-                    SecurityOpt = ["no-new-privileges"],
+                    SecurityOpt = SecurityOptions(sandbox),
+                    Runtime = sandbox.Runtime,
                     // Compiled artifacts, read-only: the program can run what was compiled and
                     // cannot rewrite it between test cases.
                     Mounts = artifactVolume is null
@@ -278,7 +279,8 @@ public sealed class DockerSandboxExecutor(
                         ["/tmp"] = "rw,exec,nosuid,mode=1777,size=256m"
                     },
                     CapDrop = ["ALL"],
-                    SecurityOpt = ["no-new-privileges"],
+                    SecurityOpt = SecurityOptions(sandbox),
+                    Runtime = sandbox.Runtime,
                     Mounts = [new Mount { Type = "volume", Source = volumeName, Target = runner.ArtifactPath, ReadOnly = false }]
                 }
             },
@@ -325,6 +327,20 @@ public sealed class DockerSandboxExecutor(
         {
             await RemoveContainerAsync(created.ID);
         }
+    }
+
+    private static IList<string> SecurityOptions(SandboxOptions sandbox)
+    {
+        var securityOptions = new List<string> { "no-new-privileges" };
+
+        // The daemon applies its default seccomp profile unless told otherwise, and the API wants
+        // a JSON profile here -- sending the CLI's "default" shorthand fails the create call.
+        if (!string.Equals(sandbox.SeccompProfile, "default", StringComparison.OrdinalIgnoreCase))
+        {
+            securityOptions.Add($"seccomp={sandbox.SeccompProfile}");
+        }
+
+        return securityOptions;
     }
 
     private async Task RemoveVolumeAsync(string volumeName)
