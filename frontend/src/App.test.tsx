@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
+import { stubFetchJson } from './test/render';
 
 function renderAt(path: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -17,16 +18,25 @@ function renderAt(path: string) {
 }
 
 describe('routing', () => {
-  it('shows the questions page at the root', () => {
-    renderAt('/');
-
-    expect(screen.getByRole('heading', { name: 'Questions' })).toBeInTheDocument();
+  // The pages fetch as soon as they mount, so every route needs something to answer with.
+  beforeEach(() => {
+    stubFetchJson({ body: [{ id: '1', slug: 'two-sum', title: 'Two Sum', difficulty: 'Easy', tags: [] }] });
   });
 
-  it('routes a problem slug to the question page', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('shows the questions page at the root', async () => {
+    renderAt('/');
+
+    expect(await screen.findByRole('heading', { name: 'Questions' })).toBeInTheDocument();
+  });
+
+  it('routes a problem slug to the question page', async () => {
+    stubFetchJson({ body: { id: '1', slug: 'two-sum', title: 'Two Sum', difficulty: 'Easy', tags: [], description: '', sampleTestCases: [] } });
+
     renderAt('/problems/two-sum');
 
-    expect(screen.getByRole('heading', { name: 'two-sum' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Two Sum' })).toBeInTheDocument();
   });
 
   it('shows a not-found page for an unknown route', () => {
