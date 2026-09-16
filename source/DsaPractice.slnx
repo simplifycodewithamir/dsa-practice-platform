@@ -14,6 +14,7 @@
     <Project Path="../tests/DsaPractice.Api.UnitTests/DsaPractice.Api.UnitTests.csproj" />
     <Project Path="../tests/DsaPractice.Api.IntegrationTests/DsaPractice.Api.IntegrationTests.csproj" />
     <Project Path="../tests/DsaPractice.Judge.UnitTests/DsaPractice.Judge.UnitTests.csproj" />
+    <Project Path="../tests/DsaPractice.Judge.IntegrationTests/DsaPractice.Judge.IntegrationTests.csproj" />
     <Project Path="../tests/DsaPractice.ContentSeeding.UnitTests/DsaPractice.ContentSeeding.UnitTests.csproj" />
     <Project Path="../tests/DsaPractice.ContentSeeding.IntegrationTests/DsaPractice.ContentSeeding.IntegrationTests.csproj" />
   </Folder>
@@ -22,4 +23,5 @@
   <Project Path="DsaPractice.ContentSeeding/DsaPractice.ContentSeeding.csproj" />
   <Project Path="DsaPractice.DataAccess/DsaPractice.DataAccess.csproj" />
   <Project Path="DsaPractice.Judge/DsaPractice.Judge.csproj" />
+  <Project Path="DsaPractice.Messaging/DsaPractice.Messaging.csproj" />
 </Solution>

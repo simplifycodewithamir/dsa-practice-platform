@@ -81,8 +81,12 @@ services:
     build:
       context: .
       dockerfile: source/DsaPractice.Judge/Dockerfile
+    environment:
+      DOTNET_ENVIRONMENT: Development
+      RabbitMq__Uri: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672"
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
     volumes:
       # required so the Judge service can spin up sandbox containers on the host
       - /var/run/docker.sock:/var/run/docker.sock

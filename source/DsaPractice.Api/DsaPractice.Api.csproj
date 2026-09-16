@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DsaPractice.DataAccess\DsaPractice.DataAccess.csproj" />
     <ProjectReference Include="..\DsaPractice.Contracts\DsaPractice.Contracts.csproj" />
+    <ProjectReference Include="..\DsaPractice.Messaging\DsaPractice.Messaging.csproj" />
   </ItemGroup>
 
 	<ItemGroup>
