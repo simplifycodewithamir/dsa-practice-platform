@@ -108,8 +108,6 @@ Not final — revisit any row whose *why* stops holding.
 ### Phase 1 — Core judging loop (local, backend only)
 The heart of the product. Submissions keep a client-supplied `userId` until Phase 3 — acceptable only because nothing is deployed yet.
 
-9. **Judge consumer with a fake executor** — manual ack, prefetch, idempotency check, retry + dead-letter queue; a `FakeSandboxExecutor` returns canned verdicts and publishes `SubmissionJudged`.
-   *Learn:* competing consumers, ack/nack/requeue, poison messages, dead-letter exchanges.
 9. **Judge consumer with a fake executor** — the Judge now consumes judge requests, "runs" them and publishes `SubmissionJudged`; the Api stores the result in item 10.
    - **Acks last**, after the result is published: if the Judge dies mid-run the message was never acked, so the broker redelivers it. Prefetch is 1 — each submission will own a container.
    - **Dead-letter queue** for anything rejected: an unparseable payload, or a run that failed. Both exchanges and all three queues are declared by `RabbitMqTopology`, shared by Api and Judge, because RabbitMQ refuses a redeclaration that disagrees with what exists.
@@ -164,14 +162,7 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
     - Verdicts are spelled out for a person ("Time limit exceeded", not `TimeLimitExceeded`), and a judge failure says it is not the submitter's fault.
     - **Hidden test cases show pass/fail and a duration, never output** — the Api already withholds it, and the UI would not render it even if it arrived.
     - Submitting is disabled while judging, so a second run cannot replace a result nobody has read yet; switching language keeps code the user actually wrote.
-    - **`userId` is a random id in localStorage** until items 19–19. **`Users` table + Api auth** (D3, D4) — identity now comes from the token, and submissions belong to a local user row.
-    - `Users(Id, Issuer, Subject, DisplayName, Role, CreatedAt)`, unique on `(Issuer, Subject)`, **provisioned on first sight** — no registration form, because the provider already did that part. `Submission` points at that row, so switching provider never orphans anyone's history.
-    - **`userId` is gone from the request.** Who submits is decided by the caller's identity; sending one changes nothing.
-    - **Roles live here, not in the token**: switching identity provider cannot change who is an admin.
-    - Reading someone else's submission returns **404, not 403** — 403 would confirm the id exists.
-    - **No token-minting code in the Api** (D4): it is configured entirely from `Authentication:Schemes:Bearer`, which is what `dotnet user-jwts` writes locally and where an identity provider's settings slot in at item 20. Tests mint their own tokens with a test-only key.
-    - **Enforcement is off** (`Auth:RequireAuthentication`) until item 20 gives the browser somewhere to get a token; submissions made without one belong to a single local-development user, so the foreign key still holds. Everything else — validating a token that is present, provisioning, owner-or-admin reads — is already in effect.
-20. It is not a login and proves nothing; the Api stops taking a client-supplied id in item 19.
+    - **`userId` is a random id in localStorage** until item 19. It is not a login and proves nothing; the Api stops taking a client-supplied id in item 19.
 
 18. **Playwright E2E suite** — the whole product against itself, in a browser: browse, open a question, write in Monaco, submit, and get a verdict from a Judge that really ran the code in a container. Nothing stubbed.
     - Covers the accepted path (with hidden cases reported as pass/fail), a wrong answer showing the student their own output, a crash reported as a runtime error rather than a wrong answer, and list filtering.
@@ -179,6 +170,13 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
     - Runs as its own CI job that builds the images and brings the stack up, with service logs and the Playwright report uploaded on failure.
 
 ### Phase 3 — Identity & accounts
+19. **`Users` table + Api auth** (D3, D4) — identity now comes from the token, and submissions belong to a local user row.
+    - `Users(Id, Issuer, Subject, DisplayName, Role, CreatedAt)`, unique on `(Issuer, Subject)`, **provisioned on first sight** — no registration form, because the provider already did that part. `Submission` points at that row, so switching provider never orphans anyone's history.
+    - **`userId` is gone from the request.** Who submits is decided by the caller's identity; sending one changes nothing.
+    - **Roles live here, not in the token**: switching identity provider cannot change who is an admin.
+    - Reading someone else's submission returns **404, not 403** — 403 would confirm the id exists.
+    - **No token-minting code in the Api** (D4): it is configured entirely from `Authentication:Schemes:Bearer`, which is what `dotnet user-jwts` writes locally and where an identity provider's settings slot in at item 20. Tests mint their own tokens with a test-only key.
+    - **Enforcement is off** (`Auth:RequireAuthentication`) until item 20 gives the browser somewhere to get a token; submissions made without one belong to a single local-development user, so the foreign key still holds. Everything else — validating a token that is present, provisioning, owner-or-admin reads — is already in effect.
 20. **Real IdP + SPA login** — choose the IdP after a fresh free-tier check (Microsoft Entra External ID, Auth0, Clerk, self-hosted Keycloak); Google + GitHub login first; the Api validates via `Authority` (JWKS, RS256); the SPA uses Authorization Code + PKCE with the access token held in memory. A BFF (tokens server-side, HttpOnly cookie) is the stricter option — revisit after launch.
     *Learn:* OIDC flows, PKCE, JWKS and key rotation, token lifetimes.
 21. **My account** — my submission history; delete my account (local data + the IdP user).
