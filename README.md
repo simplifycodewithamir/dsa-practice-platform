@@ -165,7 +165,11 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
     - **Hidden test cases show pass/fail and a duration, never output** — the Api already withholds it, and the UI would not render it even if it arrived.
     - Submitting is disabled while judging, so a second run cannot replace a result nobody has read yet; switching language keeps code the user actually wrote.
     - **`userId` is a random id in localStorage** until items 19–20. It is not a login and proves nothing; the Api stops taking a client-supplied id in item 19.
-18. **Playwright E2E suite** — browse → open → submit → verdict, run in CI. A permanent suite, separate from the ad-hoc PR-demo recorder in the `git-workflow` skill.
+
+18. **Playwright E2E suite** — the whole product against itself, in a browser: browse, open a question, write in Monaco, submit, and get a verdict from a Judge that really ran the code in a container. Nothing stubbed.
+    - Covers the accepted path (with hidden cases reported as pass/fail), a wrong answer showing the student their own output, a crash reported as a runtime error rather than a wrong answer, and list filtering.
+    - Typing into Monaco goes through the clipboard: it auto-indents and auto-closes brackets, so typing Python character by character produces mangled code.
+    - Runs as its own CI job that builds the images and brings the stack up, with service logs and the Playwright report uploaded on failure.
 
 ### Phase 3 — Identity & accounts
 19. **`Users` table + Api auth** (D3, D4) — `Users(Id, Issuer, Subject, DisplayName, Role, CreatedAt)`, just-in-time provisioning on a user's first authenticated request; `Submission.UserId` becomes a `Guid` foreign key; PR #8's endpoint protection and ownership filter return; local tokens via `dotnet user-jwts`, integration tests sign tokens with a test-only key.
