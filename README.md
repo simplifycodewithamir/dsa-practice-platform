@@ -108,8 +108,6 @@ Not final — revisit any row whose *why* stops holding.
 ### Phase 1 — Core judging loop (local, backend only)
 The heart of the product. Submissions keep a client-supplied `userId` until Phase 3 — acceptable only because nothing is deployed yet.
 
-9. **Judge consumer with a fake executor** — manual ack, prefetch, idempotency check, retry + dead-letter queue; a `FakeSandboxExecutor` returns canned verdicts and publishes `SubmissionJudged`.
-   *Learn:* competing consumers, ack/nack/requeue, poison messages, dead-letter exchanges.
 9. **Judge consumer with a fake executor** — the Judge now consumes judge requests, "runs" them and publishes `SubmissionJudged`; the Api stores the result in item 10.
    - **Acks last**, after the result is published: if the Judge dies mid-run the message was never acked, so the broker redelivers it. Prefetch is 1 — each submission will own a container.
    - **Dead-letter queue** for anything rejected: an unparseable payload, or a run that failed. Both exchanges and all three queues are declared by `RabbitMqTopology`, shared by Api and Judge, because RabbitMQ refuses a redeclaration that disagrees with what exists.
@@ -164,14 +162,7 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
     - Verdicts are spelled out for a person ("Time limit exceeded", not `TimeLimitExceeded`), and a judge failure says it is not the submitter's fault.
     - **Hidden test cases show pass/fail and a duration, never output** — the Api already withholds it, and the UI would not render it even if it arrived.
     - Submitting is disabled while judging, so a second run cannot replace a result nobody has read yet; switching language keeps code the user actually wrote.
-    - **`userId` is a random id in localStorage** until items 19–19. **`Users` table + Api auth** (D3, D4) — identity now comes from the token, and submissions belong to a local user row.
-    - `Users(Id, Issuer, Subject, DisplayName, Role, CreatedAt)`, unique on `(Issuer, Subject)`, **provisioned on first sight** — no registration form, because the provider already did that part. `Submission` points at that row, so switching provider never orphans anyone's history.
-    - **`userId` is gone from the request.** Who submits is decided by the caller's identity; sending one changes nothing.
-    - **Roles live here, not in the token**: switching identity provider cannot change who is an admin.
-    - Reading someone else's submission returns **404, not 403** — 403 would confirm the id exists.
-    - **No token-minting code in the Api** (D4): it is configured entirely from `Authentication:Schemes:Bearer`, which is what `dotnet user-jwts` writes locally and where an identity provider's settings slot in at item 20. Tests mint their own tokens with a test-only key.
-    - **Enforcement is off** (`Auth:RequireAuthentication`) until item 20 gives the browser somewhere to get a token; submissions made without one belong to a single local-development user, so the foreign key still holds. Everything else — validating a token that is present, provisioning, owner-or-admin reads — is already in effect.
-20. It is not a login and proves nothing; the Api stops taking a client-supplied id in item 19.
+    - **`userId` is a random id in localStorage** until item 19. It is not a login and proves nothing; the Api stops taking a client-supplied id in item 19.
 
 18. **Playwright E2E suite** — the whole product against itself, in a browser: browse, open a question, write in Monaco, submit, and get a verdict from a Judge that really ran the code in a container. Nothing stubbed.
     - Covers the accepted path (with hidden cases reported as pass/fail), a wrong answer showing the student their own output, a crash reported as a runtime error rather than a wrong answer, and list filtering.
@@ -179,6 +170,13 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
     - Runs as its own CI job that builds the images and brings the stack up, with service logs and the Playwright report uploaded on failure.
 
 ### Phase 3 — Identity & accounts
+19. **`Users` table + Api auth** (D3, D4) — identity now comes from the token, and submissions belong to a local user row.
+    - `Users(Id, Issuer, Subject, DisplayName, Role, CreatedAt)`, unique on `(Issuer, Subject)`, **provisioned on first sight** — no registration form, because the provider already did that part. `Submission` points at that row, so switching provider never orphans anyone's history.
+    - **`userId` is gone from the request.** Who submits is decided by the caller's identity; sending one changes nothing.
+    - **Roles live here, not in the token**: switching identity provider cannot change who is an admin.
+    - Reading someone else's submission returns **404, not 403** — 403 would confirm the id exists.
+    - **No token-minting code in the Api** (D4): it is configured entirely from `Authentication:Schemes:Bearer`, which is what `dotnet user-jwts` writes locally and where an identity provider's settings slot in at item 20. Tests mint their own tokens with a test-only key.
+    - **Enforcement is off** (`Auth:RequireAuthentication`) until item 20 gives the browser somewhere to get a token; submissions made without one belong to a single local-development user, so the foreign key still holds. Everything else — validating a token that is present, provisioning, owner-or-admin reads — is already in effect.
 20. **Real IdP + SPA login** — choose the IdP after a fresh free-tier check (Microsoft Entra External ID, Auth0, Clerk, self-hosted Keycloak); Google + GitHub login first; the Api validates via `Authority` (JWKS, RS256); the SPA uses Authorization Code + PKCE with the access token held in memory. A BFF (tokens server-side, HttpOnly cookie) is the stricter option — revisit after launch.
     *Learn:* OIDC flows, PKCE, JWKS and key rotation, token lifetimes.
 21. **My account** — my submission history; delete my account (local data + the IdP user).
@@ -189,23 +187,30 @@ A free code-execution service is an obvious target for crypto-mining and abuse �
 
 22. **Rate limits & backpressure** — ASP.NET Core rate limiter (per-user token bucket on submissions, per-IP on public reads), max source size, one in-flight submission per user, `503` + `Retry-After` when the judge queue is too deep.
     *Learn:* rate-limiting algorithms, backpressure, fail-fast vs queueing.
-23. **Observability** — OpenTelemetry traces across Api → RabbitMQ → Judge (trace context in message headers), metrics (queue depth, judge duration, verdict counts), liveness/readiness health checks; Aspire dashboard locally, Grafana Cloud free tier in production.
+23. **Consumer scaffolding into `DsaPractice.Messaging`** — the shared messaging assembly is publish-side only (`IRabbitMqConnection`, `RabbitMqOptions`, `IMessagePublisher`, `RabbitMqTopology`), so each service hand-rolls its own consumer: `JudgedResultConsumer` (Api, item 10) and `JudgeRequestConsumer` (Judge, item 9) share 67 lines verbatim — connect-with-retry, channel and prefetch setup, the consume loop, and the deserialize-or-dead-letter preamble.
+    - A `RabbitMqConsumer<TMessage>` base class in `DsaPractice.Messaging` owns all of that; a service supplies its queue name, its prefetch, and a handler returning the delivery disposition. That project needs `Microsoft.Extensions.Hosting.Abstractions` added to it — not having it is why the base class couldn't live there when item 9 first split messaging out, and with one consumer there was nothing to share anyway.
+    - **The ack decision stays with the handler, not the base class.** It's business policy, not transport: the Api *acks* a result for a submission that doesn't exist (nothing to retry, parking it is only noise), while the Judge publishes an `InternalError` verdict *before* dead-lettering the request. A base class that decided this for both would be wrong for one of them.
+    - Judge-only behaviour stays in the Judge: the `ProcessedSubmissions` redelivery guard, and acking only after the result is published.
+    - Do it before item 24 — trace context in message headers is exactly the kind of cross-cutting change that otherwise gets hand-copied into both consumers, which is how the duplication got here in the first place.
+    - **No behaviour change**, so the existing Api and Judge integration tests are the proof it worked. That, and the fact that the duplication only became visible once item 10 made the Api a consumer too, is why this is its own PR rather than a tidy-up buried in a feature.
+    *Learn:* where an abstraction should stop — transport mechanics are shareable, delivery-disposition policy isn't.
+24. **Observability** — OpenTelemetry traces across Api → RabbitMQ → Judge (trace context in message headers), metrics (queue depth, judge duration, verdict counts), liveness/readiness health checks; Aspire dashboard locally, Grafana Cloud free tier in production.
     *Learn:* distributed tracing, context propagation, RED metrics.
-24. **Production configuration** — per-environment settings, secrets via environment/files on the VM, forwarded headers behind Cloudflare, HSTS and security headers, CORS locked to the real domain, tests proving Development-only surfaces (Scalar, OpenAPI) are off elsewhere.
+25. **Production configuration** — per-environment settings, secrets via environment/files on the VM, forwarded headers behind Cloudflare, HSTS and security headers, CORS locked to the real domain, tests proving Development-only surfaces (Scalar, OpenAPI) are off elsewhere.
 
 ### Phase 5 — Go live (free hosting)
-25. **VM provisioning** (D1) — Oracle Always Free arm64 VM, Docker, firewall with no inbound except key-only SSH, unattended security upgrades; check Oracle's current idle-instance reclamation policy first. Documented in `docs/`.
-26. **Domain + Cloudflare** (D2) — DNS, Tunnel → `api.<domain>`, Pages → frontend, TLS; Turnstile on signup if the IdP doesn't already cover bots.
-27. **Continuous deployment** — extend CI: multi-arch images → GHCR (free), a deploy job runs `docker compose pull && docker compose up -d` on the VM (migrator first); rollback = redeploy the previous image tag.
-28. **Backups** — nightly `pg_dump` → Cloudflare R2 (10 GB free), a retention policy, and one real restore drill.
-29. **Launch checklist** — 20–30 questions seeded, privacy policy, terms + acceptable-use policy (no mining, no attacks), about/contact pages, free uptime monitor, a load smoke test against the VM.
+26. **VM provisioning** (D1) — Oracle Always Free arm64 VM, Docker, firewall with no inbound except key-only SSH, unattended security upgrades; check Oracle's current idle-instance reclamation policy first. Documented in `docs/`.
+27. **Domain + Cloudflare** (D2) — DNS, Tunnel → `api.<domain>`, Pages → frontend, TLS; Turnstile on signup if the IdP doesn't already cover bots.
+28. **Continuous deployment** — extend CI: multi-arch images → GHCR (free), a deploy job runs `docker compose pull && docker compose up -d` on the VM (migrator first); rollback = redeploy the previous image tag.
+29. **Backups** — nightly `pg_dump` → Cloudflare R2 (10 GB free), a retention policy, and one real restore drill.
+30. **Launch checklist** — 20–30 questions seeded, privacy policy, terms + acceptable-use policy (no mining, no attacks), about/contact pages, free uptime monitor, a load smoke test against the VM.
 
 ### Phase 6 — Growth & monetization (after launch)
-30. **SEO** — `sitemap.xml`, `robots.txt`, canonical slug URLs, meta/Open Graph tags; register with Google Search Console.
-31. **Content** — a written editorial for every question (the original content AdSense reviews), growing past 50 questions.
-32. **Analytics** — Cloudflare Web Analytics (free and cookieless, so no consent banner needed for it).
-33. **Google AdSense** — apply once content and traffic exist; `ads.txt`; Google-certified consent banner (required for EEA/UK/Swiss visitors); ads on list and editorial pages only, **never** on the editor/judge page.
-34. **v2 candidates** — only once v1 has real users: progress tracking and streaks, more languages (Java, C++, JavaScript), leaderboard, SSE live verdicts, an admin UI for authoring questions, runtime/memory stats, BFF auth.
+31. **SEO** — `sitemap.xml`, `robots.txt`, canonical slug URLs, meta/Open Graph tags; register with Google Search Console.
+32. **Content** — a written editorial for every question (the original content AdSense reviews), growing past 50 questions.
+33. **Analytics** — Cloudflare Web Analytics (free and cookieless, so no consent banner needed for it).
+34. **Google AdSense** — apply once content and traffic exist; `ads.txt`; Google-certified consent banner (required for EEA/UK/Swiss visitors); ads on list and editorial pages only, **never** on the editor/judge page.
+35. **v2 candidates** — only once v1 has real users: progress tracking and streaks, more languages (Java, C++, JavaScript), leaderboard, SSE live verdicts, an admin UI for authoring questions, runtime/memory stats, BFF auth.
 
 ## Local dev
 ```bash
