@@ -15,6 +15,11 @@ internal sealed class SubmissionConfiguration : IEntityTypeConfiguration<Submiss
             .HasForeignKey(s => s.QuestionId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(s => s.OwnerUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(s => s.Status).HasConversion<string>().HasMaxLength(20);
         builder.Property(s => s.CompileOutput).HasMaxLength(SubmissionTestResult.MaxOutputLength);
         builder.Property(s => s.Verdict).HasConversion<string>().HasMaxLength(30);

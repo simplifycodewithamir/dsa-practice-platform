@@ -17,7 +17,7 @@ public class SubmissionsEndpointsTests(ApiWebApplicationFactory factory)
     {
         var question = await TestData.SeedAsync(factory, TestData.NewQuestion());
         using var client = factory.CreateClient();
-        var request = new CreateSubmissionRequest(question.Id, "user-1", "csharp", "Console.WriteLine(1);");
+        var request = new CreateSubmissionRequest(question.Id, "csharp", "Console.WriteLine(1);");
 
         using var response = await client.PostAsJsonAsync("/api/v1/submissions", request, TestContext.Current.CancellationToken);
 
@@ -38,7 +38,7 @@ public class SubmissionsEndpointsTests(ApiWebApplicationFactory factory)
     public async Task CreateSubmission_UnknownQuestionId_Returns404()
     {
         using var client = factory.CreateClient();
-        var request = new CreateSubmissionRequest(Guid.NewGuid(), "user-1", "csharp", "Console.WriteLine(1);");
+        var request = new CreateSubmissionRequest(Guid.NewGuid(), "csharp", "Console.WriteLine(1);");
 
         using var response = await client.PostAsJsonAsync("/api/v1/submissions", request, TestContext.Current.CancellationToken);
 
@@ -52,7 +52,7 @@ public class SubmissionsEndpointsTests(ApiWebApplicationFactory factory)
     {
         var question = await TestData.SeedAsync(factory, TestData.NewQuestion());
         using var client = factory.CreateClient();
-        var request = new CreateSubmissionRequest(question.Id, "user-1", "rust", "fn main() {}");
+        var request = new CreateSubmissionRequest(question.Id, "rust", "fn main() {}");
 
         using var response = await client.PostAsJsonAsync("/api/v1/submissions", request, TestContext.Current.CancellationToken);
 

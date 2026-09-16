@@ -6,12 +6,14 @@ using Microsoft.Extensions.Options;
 
 namespace DsaPractice.Api.Endpoints;
 
-internal sealed record CreateSubmissionRequest(Guid QuestionId, string UserId, string Language, string SourceCode);
+// No UserId: who is submitting is decided by the caller's identity, never by a field the caller
+// can set (decision D3).
+internal sealed record CreateSubmissionRequest(Guid QuestionId, string Language, string SourceCode);
 
 internal sealed record SubmissionResponse(
     Guid Id,
     Guid QuestionId,
-    string UserId,
+    Guid UserId,
     string Language,
     SubmissionStatus Status,
     SubmissionVerdict? Verdict,
@@ -23,7 +25,7 @@ internal sealed record SubmissionResponse(
     public static SubmissionResponse FromEntity(Submission submission) => new(
         submission.Id,
         submission.QuestionId,
-        submission.UserId,
+        submission.OwnerUserId,
         submission.Language,
         submission.Status,
         submission.Verdict,
@@ -55,7 +57,6 @@ internal sealed class CreateSubmissionRequestValidator : AbstractValidator<Creat
         var supportedLanguages = options.Value.SupportedLanguages;
 
         RuleFor(x => x.QuestionId).NotEmpty();
-        RuleFor(x => x.UserId).NotEmpty();
         RuleFor(x => x.SourceCode).NotEmpty();
         RuleFor(x => x.Language)
             .Must(language => supportedLanguages.Contains(language))

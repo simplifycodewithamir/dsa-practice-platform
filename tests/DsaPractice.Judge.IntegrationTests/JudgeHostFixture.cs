@@ -33,6 +33,13 @@ public sealed class JudgeHostFixture : IAsyncLifetime
         await _rabbitMq.StartAsync();
         Connection = await new ConnectionFactory { Uri = new Uri(_rabbitMq.GetConnectionString()) }.CreateConnectionAsync();
 
+        // The host only declares the topology when its consumer first connects, which happens on a
+        // background thread after StartAsync returns. Every test purges these queues before it runs,
+        // and purging a queue that does not exist yet is a 404 that kills the channel -- so declare
+        // it here instead of racing the host. Declaration is idempotent; the host agrees with what
+        // it finds.
+        await RabbitMqTopology.DeclareAsync(Connection, Options, CancellationToken.None);
+
         var builder = Host.CreateApplicationBuilder();
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
         // Bound from configuration rather than set in code: RabbitMqOptions.Uri is `required init`,
