@@ -153,23 +153,30 @@ A free code-execution service is an obvious target for crypto-mining and abuse �
 
 22. **Rate limits & backpressure** — ASP.NET Core rate limiter (per-user token bucket on submissions, per-IP on public reads), max source size, one in-flight submission per user, `503` + `Retry-After` when the judge queue is too deep.
     *Learn:* rate-limiting algorithms, backpressure, fail-fast vs queueing.
-23. **Observability** — OpenTelemetry traces across Api → RabbitMQ → Judge (trace context in message headers), metrics (queue depth, judge duration, verdict counts), liveness/readiness health checks; Aspire dashboard locally, Grafana Cloud free tier in production.
+23. **Consumer scaffolding into `DsaPractice.Messaging`** — the shared messaging assembly is publish-side only (`IRabbitMqConnection`, `RabbitMqOptions`, `IMessagePublisher`, `RabbitMqTopology`), so each service hand-rolls its own consumer: `JudgedResultConsumer` (Api, item 10) and `JudgeRequestConsumer` (Judge, item 9) share 67 lines verbatim — connect-with-retry, channel and prefetch setup, the consume loop, and the deserialize-or-dead-letter preamble.
+    - A `RabbitMqConsumer<TMessage>` base class in `DsaPractice.Messaging` owns all of that; a service supplies its queue name, its prefetch, and a handler returning the delivery disposition. That project needs `Microsoft.Extensions.Hosting.Abstractions` added to it — not having it is why the base class couldn't live there when item 9 first split messaging out, and with one consumer there was nothing to share anyway.
+    - **The ack decision stays with the handler, not the base class.** It's business policy, not transport: the Api *acks* a result for a submission that doesn't exist (nothing to retry, parking it is only noise), while the Judge publishes an `InternalError` verdict *before* dead-lettering the request. A base class that decided this for both would be wrong for one of them.
+    - Judge-only behaviour stays in the Judge: the `ProcessedSubmissions` redelivery guard, and acking only after the result is published.
+    - Do it before item 24 — trace context in message headers is exactly the kind of cross-cutting change that otherwise gets hand-copied into both consumers, which is how the duplication got here in the first place.
+    - **No behaviour change**, so the existing Api and Judge integration tests are the proof it worked. That, and the fact that the duplication only became visible once item 10 made the Api a consumer too, is why this is its own PR rather than a tidy-up buried in a feature.
+    *Learn:* where an abstraction should stop — transport mechanics are shareable, delivery-disposition policy isn't.
+24. **Observability** — OpenTelemetry traces across Api → RabbitMQ → Judge (trace context in message headers), metrics (queue depth, judge duration, verdict counts), liveness/readiness health checks; Aspire dashboard locally, Grafana Cloud free tier in production.
     *Learn:* distributed tracing, context propagation, RED metrics.
-24. **Production configuration** — per-environment settings, secrets via environment/files on the VM, forwarded headers behind Cloudflare, HSTS and security headers, CORS locked to the real domain, tests proving Development-only surfaces (Scalar, OpenAPI) are off elsewhere.
+25. **Production configuration** — per-environment settings, secrets via environment/files on the VM, forwarded headers behind Cloudflare, HSTS and security headers, CORS locked to the real domain, tests proving Development-only surfaces (Scalar, OpenAPI) are off elsewhere.
 
 ### Phase 5 — Go live (free hosting)
-25. **VM provisioning** (D1) — Oracle Always Free arm64 VM, Docker, firewall with no inbound except key-only SSH, unattended security upgrades; check Oracle's current idle-instance reclamation policy first. Documented in `docs/`.
-26. **Domain + Cloudflare** (D2) — DNS, Tunnel → `api.<domain>`, Pages → frontend, TLS; Turnstile on signup if the IdP doesn't already cover bots.
-27. **Continuous deployment** — extend CI: multi-arch images → GHCR (free), a deploy job runs `docker compose pull && docker compose up -d` on the VM (migrator first); rollback = redeploy the previous image tag.
-28. **Backups** — nightly `pg_dump` → Cloudflare R2 (10 GB free), a retention policy, and one real restore drill.
-29. **Launch checklist** — 20–30 questions seeded, privacy policy, terms + acceptable-use policy (no mining, no attacks), about/contact pages, free uptime monitor, a load smoke test against the VM.
+26. **VM provisioning** (D1) — Oracle Always Free arm64 VM, Docker, firewall with no inbound except key-only SSH, unattended security upgrades; check Oracle's current idle-instance reclamation policy first. Documented in `docs/`.
+27. **Domain + Cloudflare** (D2) — DNS, Tunnel → `api.<domain>`, Pages → frontend, TLS; Turnstile on signup if the IdP doesn't already cover bots.
+28. **Continuous deployment** — extend CI: multi-arch images → GHCR (free), a deploy job runs `docker compose pull && docker compose up -d` on the VM (migrator first); rollback = redeploy the previous image tag.
+29. **Backups** — nightly `pg_dump` → Cloudflare R2 (10 GB free), a retention policy, and one real restore drill.
+30. **Launch checklist** — 20–30 questions seeded, privacy policy, terms + acceptable-use policy (no mining, no attacks), about/contact pages, free uptime monitor, a load smoke test against the VM.
 
 ### Phase 6 — Growth & monetization (after launch)
-30. **SEO** — `sitemap.xml`, `robots.txt`, canonical slug URLs, meta/Open Graph tags; register with Google Search Console.
-31. **Content** — a written editorial for every question (the original content AdSense reviews), growing past 50 questions.
-32. **Analytics** — Cloudflare Web Analytics (free and cookieless, so no consent banner needed for it).
-33. **Google AdSense** — apply once content and traffic exist; `ads.txt`; Google-certified consent banner (required for EEA/UK/Swiss visitors); ads on list and editorial pages only, **never** on the editor/judge page.
-34. **v2 candidates** — only once v1 has real users: progress tracking and streaks, more languages (Java, C++, JavaScript), leaderboard, SSE live verdicts, an admin UI for authoring questions, runtime/memory stats, BFF auth.
+31. **SEO** — `sitemap.xml`, `robots.txt`, canonical slug URLs, meta/Open Graph tags; register with Google Search Console.
+32. **Content** — a written editorial for every question (the original content AdSense reviews), growing past 50 questions.
+33. **Analytics** — Cloudflare Web Analytics (free and cookieless, so no consent banner needed for it).
+34. **Google AdSense** — apply once content and traffic exist; `ads.txt`; Google-certified consent banner (required for EEA/UK/Swiss visitors); ads on list and editorial pages only, **never** on the editor/judge page.
+35. **v2 candidates** — only once v1 has real users: progress tracking and streaks, more languages (Java, C++, JavaScript), leaderboard, SSE live verdicts, an admin UI for authoring questions, runtime/memory stats, BFF auth.
 
 ## Local dev
 ```bash
