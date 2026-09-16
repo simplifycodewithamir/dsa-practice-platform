@@ -177,20 +177,22 @@ The heart of the product. Submissions keep a client-supplied `userId` until Phas
     - Reading someone else's submission returns **404, not 403** — 403 would confirm the id exists.
     - **No token-minting code in the Api** (D4): it is configured entirely from `Authentication:Schemes:Bearer`, which is what `dotnet user-jwts` writes locally and where an identity provider's settings slot in at item 20. Tests mint their own tokens with a test-only key.
     - **Enforcement is off** (`Auth:RequireAuthentication`) until item 20 gives the browser somewhere to get a token; submissions made without one belong to a single local-development user, so the foreign key still holds. Everything else — validating a token that is present, provisioning, owner-or-admin reads — is already in effect.
-19a. **Per-question starter code** — done out of sequence, ahead of item 20: writing the `Main` and the
-    stdin parsing by hand was the first thing every solver hit, and the compile errors it produced
-    were in boilerplate rather than in anyone's algorithm.
-    - `content/questions/<slug>/starters/<language>.<ext>` — the filename's stem is the language id,
-      the extension only exists so an editor highlights the file. Optional: a question with none
-      falls back to the generic "read from stdin, print the answer" comment.
-    - **D8 is not reversed.** Judging is still stdin/stdout; the skeleton just writes the I/O for you
-      and leaves one method. LeetCode-style signatures stay a v2 candidate (item 35).
-    - Stored as a `jsonb` map on `Questions`, the same call as `Tags` → `text[]`: a small map always
-      read with its question and never queried by language on its own doesn't earn a child table.
-      Serialised by an explicit EF converter rather than Npgsql's `EnableDynamicJson()`, which would
-      otherwise have to be remembered by every host that builds a data source — Api, migrator, tests.
-    - `tools/check-starters.sh` builds every starter with the Judge's own runner images and compile
-      command, read out of its `appsettings.json`. A starter that doesn't compile is worse than none.
+**19a. Per-question starter code** — done out of sequence, ahead of item 20: writing the `Main` and
+the stdin parsing by hand was the first thing every solver hit, and the compile errors it produced
+were in boilerplate rather than in anyone's algorithm.
+
+- `content/questions/<slug>/starters/<language>.<ext>` — the filename's stem is the language id,
+  the extension only exists so an editor highlights the file. Optional: a question with none falls
+  back to the generic "read from stdin, print the answer" comment.
+- **D8 is not reversed.** Judging is still stdin/stdout; the skeleton just writes the I/O for you
+  and leaves one method. LeetCode-style signatures stay a v2 candidate (item 35).
+- Stored as a `jsonb` map on `Questions`, the same call as `Tags` → `text[]`: a small map always
+  read with its question and never queried by language on its own doesn't earn a child table.
+  Serialised by an explicit EF converter rather than Npgsql's `EnableDynamicJson()`, which would
+  otherwise have to be remembered by every host that builds a data source — Api, migrator, tests.
+- `tools/check-starters.sh` builds every starter with the Judge's own runner images and compile
+  command, read out of its `appsettings.json`. A starter that doesn't compile is worse than none.
+
 20. **Real IdP + SPA login** — choose the IdP after a fresh free-tier check (Microsoft Entra External ID, Auth0, Clerk, self-hosted Keycloak); Google + GitHub login first; the Api validates via `Authority` (JWKS, RS256); the SPA uses Authorization Code + PKCE with the access token held in memory. A BFF (tokens server-side, HttpOnly cookie) is the stricter option — revisit after launch.
     *Learn:* OIDC flows, PKCE, JWKS and key rotation, token lifetimes.
 21. **My account** — my submission history; delete my account (local data + the IdP user).
@@ -211,6 +213,115 @@ A free code-execution service is an obvious target for crypto-mining and abuse �
 24. **Observability** — OpenTelemetry traces across Api → RabbitMQ → Judge (trace context in message headers), metrics (queue depth, judge duration, verdict counts), liveness/readiness health checks; Aspire dashboard locally, Grafana Cloud free tier in production.
     *Learn:* distributed tracing, context propagation, RED metrics.
 25. **Production configuration** — per-environment settings, secrets via environment/files on the VM, forwarded headers behind Cloudflare, HSTS and security headers, CORS locked to the real domain, tests proving Development-only surfaces (Scalar, OpenAPI) are off elsewhere.
+
+**25a. UX pass — theming, layout, hints and the small things.** Everything up to here makes the
+product *work*; none of it makes it pleasant. Sequenced here, after the abuse protection,
+because a polished site that gets crypto-mined is worse than a plain one that doesn't — but
+before launch, because the editor page is the whole product and first impressions of it decide
+whether anyone comes back.
+
+**This is a bundle, not one PR.** Land it as several small ones in roughly the order below;
+each bullet is independently shippable. Two of them (hints, solved/unsolved) are not
+frontend-only — they need content, schema and Api work, so budget for that.
+
+**Theming**
+
+- **Dark mode**, tri-state: system / light / dark. Default to `prefers-color-scheme`, persist the
+  explicit choice in `localStorage`, and set it before first paint so there is no white flash.
+  Monaco's theme has to follow the app's — a light editor inside a dark page is worse than no
+  dark mode at all.
+- Honour `prefers-reduced-motion` everywhere, and check AA contrast on **both** themes, not just
+  the one that was designed first.
+- A high-contrast option, and an editor/statement font-size control. Both are accessibility
+  features that happen to also be preferences.
+
+**Layout**
+
+- **Resizable split** between statement and editor, dragged by the divider, with a
+  **vertical/horizontal toggle** — some people want the statement beside the code, some above
+  it. Persist the orientation and the ratio.
+- **Collapse the statement** entirely, and a full-screen editor mode, for when you have read the
+  problem and just want to work.
+- **Adaptive, not just responsive**: below the split's minimum useful width the two panes become
+  tabs (Statement / Code / Result) rather than a squeezed split. A drag handle is also useless on
+  a touch screen — the toggle has to work without one.
+- Remember pane state globally rather than per question; a per-question memory is a surprise, not
+  a convenience.
+
+**Editor**
+
+- Settings that persist: tab size, spaces vs tabs, word wrap, minimap, line numbers. Small, but
+  these are the first thing a regular notices is missing.
+- **Keyboard shortcuts** — `Ctrl/Cmd+Enter` to submit, `Esc` to leave full screen, `?` for a
+  shortcut sheet. Anything a mouse can do here should have a key.
+- **Draft autosave per (question, language)** in `localStorage`, restored on return, with an
+  explicit **"Reset to starter"** button. Losing half an hour of work to a refresh is the kind of
+  thing people leave over. *Decide when picked up:* stays local, or moves server-side once
+  accounts exist (item 21) — server-side means a sync/conflict story, so local first.
+- Copy-to-clipboard and download-file buttons on the editor.
+- *Optional, decide when picked up:* Vim/Emacs keybindings via `monaco-vim`. A real draw for a
+  slice of the audience and dead weight for the rest — worth it only if it stays a lazy-loaded
+  chunk.
+
+**Hints and learning** (the LeetCode-style hint button)
+- **Progressive hints**, revealed one at a time behind a click, with the count visible up front
+  so a reader knows how much help exists. Authored as content —
+  `content/questions/<slug>/hints/01.md` — so this needs the loader, a column and the Api, the
+  same shape as item 19a's starters, **not** a frontend-only change.
+- *Decide when picked up:* whether hints are gated (after N failed submissions or M minutes) or
+  always available. Gating pushes people to think first; it also reads as the site withholding
+  something it already has. Lean ungated — the click is already a deliberate act.
+- **Editorial / reference solution reveal**, behind a confirmation, and separate from hints: one
+  is a nudge, the other ends the exercise. Editorials are already item 32's job for SEO, so the
+  content exists either way.
+- Show the intended complexity **after** a solve, and link related questions by tag.
+
+**Feedback on a submission**
+
+- **A real diff for a wrong answer** — expected vs actual, character level, with trailing
+  whitespace made visible. "Wrong answer" plus two blobs of text is a puzzle on top of a puzzle.
+- Mark the failing sample inline next to the sample it corresponds to, rather than only in the
+  results panel.
+- Per-test timing, with the slowest highlighted — that is how someone discovers their solution is
+  quadratic without being told.
+- **Judging progress** (queued → compiling → running 3/12) instead of an indeterminate spinner.
+  Depends on the Judge emitting progress, so it rides with SSE live verdicts (item 35) — don't
+  fake it with a timer.
+- Skeleton loaders in place of "Loading…", and a distinct **"the judge is unavailable"** state,
+  since that one is not the submitter's fault and should not read like a rejection.
+
+**Finding a question**
+
+- Search over title and tags, filter by tag, and **solved/unsolved** once accounts exist
+  (item 21). Sort by difficulty or title.
+- **Put the filters in the URL** so a filtered list is shareable and the back button works.
+  Cheap now, annoying to retrofit.
+- Previous/next links on a question page, and keyboard navigation of the list.
+
+**Accessibility** — the floor, not a feature
+- Move focus to the heading on route change and announce it in a live region; SPA navigation is
+  silent to a screen reader otherwise.
+- A skip-to-content link, and Monaco's own screen-reader mode surfaced rather than hidden.
+- **Automated axe checks in the Playwright suite**, so this stops being something that has to be
+  remembered.
+
+**Perceived speed**
+
+- Code-split Monaco — the list page currently pays for an editor it never shows.
+- Prefetch a question on link hover.
+
+**Small things that are only small individually**
+
+- Copy buttons on sample input/output.
+- Real empty states with an action in them, not a blank panel.
+- An offline banner, so a failed request doesn't read as a broken site.
+- A "report a problem with this question" link — free QA on the content.
+
+*Learn:* designing for preference vs. accessibility (and where they overlap), `prefers-*` media
+queries, focus management in an SPA, and the difference between responsive and adaptive layout.
+
+**Deliberately not here:** i18n, a mobile app, and anything needing a design system — v2 at the
+earliest, and only with real users asking.
 
 ### Phase 5 — Go live (free hosting)
 26. **VM provisioning** (D1) — Oracle Always Free arm64 VM, Docker, firewall with no inbound except key-only SSH, unattended security upgrades; check Oracle's current idle-instance reclamation policy first. Documented in `docs/`.
