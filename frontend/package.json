@@ -13,7 +13,9 @@
     "generate:api": "openapi-typescript http://localhost:8080/openapi/v1.json -o src/api/schema.d.ts"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "@tanstack/react-query": "^5.102.8",
+    "monaco-editor": "^0.54.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0",
