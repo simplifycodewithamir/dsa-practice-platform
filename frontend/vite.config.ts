@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
@@ -21,6 +21,10 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // Vitest's default glob would also pick up e2e/*.spec.ts, and importing @playwright/test
+    // inside the Vitest runner fails outright ("Playwright Test did not expect test() to be
+    // called here"). The e2e suite is Playwright's, run by `npm run test:e2e`.
+    exclude: [...configDefaults.exclude, 'e2e/**'],
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: true,
