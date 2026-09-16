@@ -1,3 +1,4 @@
+using Docker.DotNet;
 using DsaPractice.Judge.Execution;
 using DsaPractice.Judge.Messaging;
 using DsaPractice.Messaging;
@@ -25,12 +26,27 @@ builder.Services.AddSingleton<IMessagePublisher, RabbitMqPublisher>();
 builder.Services.AddSingleton(sp =>
     new ProcessedSubmissions(sp.GetRequiredService<IOptions<JudgeOptions>>().Value.ProcessedCacheSize));
 
-// Until item 11 there is no sandbox, so nothing is executed -- see FakeSandboxExecutor.
-builder.Services.AddSingleton<ISandboxExecutor, FakeSandboxExecutor>();
+builder.Services.AddOptions<SandboxOptions>()
+    .Bind(builder.Configuration.GetSection(SandboxOptions.SectionName))
+    .Validate(o => o.CpuCores > 0, "Judge:Sandbox:CpuCores must be greater than zero.")
+    .Validate(o => o.PidsLimit > 0, "Judge:Sandbox:PidsLimit must be greater than zero.")
+    .Validate(o => o.MaxOutputBytes > 0, "Judge:Sandbox:MaxOutputBytes must be greater than zero.")
+    .ValidateOnStart();
+
+if (builder.Configuration.GetValue($"{JudgeOptions.SectionName}:UseFakeExecutor", true))
+{
+    // Nothing is executed -- see FakeSandboxExecutor. Still the default until item 12 configures
+    // a real language runner.
+    builder.Services.AddSingleton<ISandboxExecutor, FakeSandboxExecutor>();
+}
+else
+{
+    builder.Services.AddSingleton<IDockerClient>(_ => new DockerClientBuilder().Build());
+    builder.Services.AddSingleton<ISandboxExecutor, DockerSandboxExecutor>();
+}
 
 builder.Services.AddHostedService<JudgeRequestConsumer>();
 
-// TODO (item 11): replace FakeSandboxExecutor with the Docker.DotNet sandbox and per-language runners
 // TODO (item 23): OpenTelemetry, trace context propagated from the message headers
 
 var host = builder.Build();
