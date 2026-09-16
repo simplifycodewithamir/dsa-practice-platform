@@ -256,6 +256,9 @@ export interface components {
             timeLimitMs: number | string;
             /** Format: int32 */
             memoryLimitMb: number | string;
+            starters: {
+                [key: string]: string;
+            };
             sampleTestCases: components["schemas"]["TestCaseResponse"][];
         };
         /** @enum {unknown} */

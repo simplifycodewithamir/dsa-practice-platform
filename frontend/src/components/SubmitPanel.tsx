@@ -3,16 +3,31 @@ import Editor from '@monaco-editor/react';
 import { useCreateSubmission, useSubmission } from '../api/queries';
 import VerdictPanel from './VerdictPanel';
 
-/** Matches Submissions:SupportedLanguages on the Api; both are v1 scope. */
+/**
+ * Matches Submissions:SupportedLanguages on the Api; both are v1 scope. `fallback` is only used for
+ * a question that has no starter authored for that language yet -- the real skeletons are content
+ * (content/questions/<slug>/starters/) and arrive on the question.
+ */
 const languages = [
-  { id: 'python', label: 'Python', monaco: 'python', starter: '# Read from stdin, print the answer.\n' },
-  { id: 'csharp', label: 'C#', monaco: 'csharp', starter: '// Read from stdin, print the answer.\n' },
+  { id: 'python', label: 'Python', monaco: 'python', fallback: '# Read from stdin, print the answer.\n' },
+  { id: 'csharp', label: 'C#', monaco: 'csharp', fallback: '// Read from stdin, print the answer.\n' },
 ] as const;
 
-export default function SubmitPanel({ questionId }: { questionId: string }) {
-  const [language, setLanguage] = useState<(typeof languages)[number]>(languages[0]);
-  // Annotated: the starters are literal types, and inference would pin the state to one of them.
-  const [sourceCode, setSourceCode] = useState<string>(languages[0].starter);
+type Language = (typeof languages)[number];
+
+export default function SubmitPanel({
+  questionId,
+  starters = {},
+}: {
+  questionId: string;
+  /** Language id to skeleton, as authored for this question. */
+  starters?: Record<string, string>;
+}) {
+  const starterFor = (candidate: Language) => starters[candidate.id] ?? candidate.fallback;
+
+  const [language, setLanguage] = useState<Language>(languages[0]);
+  // Lazy: starterFor reads a prop, and an eager call would re-run this on every render for nothing.
+  const [sourceCode, setSourceCode] = useState<string>(() => starterFor(languages[0]));
 
   const createSubmission = useCreateSubmission();
   const submissionId = createSubmission.data?.id;
@@ -28,8 +43,9 @@ export default function SubmitPanel({ questionId }: { questionId: string }) {
     setLanguage(next);
 
     // Only replaces code the user hasn't touched, so switching language never eats their work.
+    // "Untouched" means any language's starter for this question, not just the current one's.
     setSourceCode((current: string) =>
-      languages.some((candidate) => candidate.starter === current) ? next.starter : current,
+      languages.some((candidate) => starterFor(candidate) === current) ? starterFor(next) : current,
     );
   }
 

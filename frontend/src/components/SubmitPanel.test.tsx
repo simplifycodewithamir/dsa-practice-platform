@@ -13,6 +13,11 @@ vi.mock('@monaco-editor/react', () => ({
   ),
 }));
 
+const starters = {
+  python: '# python starter\n',
+  csharp: '// csharp starter\n',
+};
+
 const pending = { id: 's1', questionId: 'q1', status: 'Pending', verdict: null, testResults: [] };
 const accepted = {
   ...pending,
@@ -70,13 +75,48 @@ describe('SubmitPanel', () => {
   });
 
   it('keeps code the user wrote when the language changes', async () => {
-    renderPage(<SubmitPanel questionId="q1" />);
+    renderPage(<SubmitPanel questionId="q1" starters={starters} />);
     await userEvent.clear(screen.getByLabelText('Source code'));
     await userEvent.type(screen.getByLabelText('Source code'), 'my own work');
 
     await userEvent.selectOptions(screen.getByLabelText('Language'), 'csharp');
 
     expect(screen.getByLabelText('Source code')).toHaveValue('my own work');
+  });
+
+  it("opens with the question's starter for the default language", async () => {
+    renderPage(<SubmitPanel questionId="q1" starters={starters} />);
+
+    expect(screen.getByLabelText('Source code')).toHaveValue('# python starter\n');
+  });
+
+  it("swaps in the other language's starter when the code is still untouched", async () => {
+    renderPage(<SubmitPanel questionId="q1" starters={starters} />);
+
+    await userEvent.selectOptions(screen.getByLabelText('Language'), 'csharp');
+
+    expect(screen.getByLabelText('Source code')).toHaveValue('// csharp starter\n');
+  });
+
+  it('falls back to a generic skeleton for a language the question has no starter for', async () => {
+    // A question authored before starters existed, or one that only ships a Python skeleton.
+    renderPage(<SubmitPanel questionId="q1" starters={{ python: '# python starter\n' }} />);
+
+    await userEvent.selectOptions(screen.getByLabelText('Language'), 'csharp');
+
+    expect(screen.getByLabelText('Source code')).toHaveValue('// Read from stdin, print the answer.\n');
+  });
+
+  it('submits the starter as the source code when the user only fills part of it in', async () => {
+    const fetchMock = stubFetchJson({ body: pending }, { body: accepted });
+    renderPage(<SubmitPanel questionId="q1" starters={starters} />);
+
+    await userEvent.type(screen.getByLabelText('Source code'), 'print(1)');
+    await userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.sourceCode).toBe('# python starter\nprint(1)');
   });
 
   it('reports a failed submission instead of looking like nothing happened', async () => {

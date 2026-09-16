@@ -28,6 +28,17 @@ request and response type from it. A contract change therefore breaks the build 
 page. Regenerate it with the Api running (`docker compose --profile full-stack up -d`), and commit
 the result so a build never needs a live Api.
 
+## The editor opens with the question's starter, not an empty page
+
+`SubmitPanel` gets a `starters` map (language id → skeleton) on the question and opens with the one
+for the selected language. Those skeletons are **content**, authored under
+`content/questions/<slug>/starters/` — see "Authoring a question" in the root README. A question
+with no starter for the chosen language falls back to the generic comment defined in
+`SubmitPanel.tsx`.
+
+Switching language replaces the code only while it is still exactly some language's starter, so it
+never eats work someone has typed.
+
 ## Why there is no CORS problem in development
 
 The dev server proxies `/api` to the Api, so the browser sees a single origin. In production they

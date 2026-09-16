@@ -17,6 +17,16 @@ public sealed class Question
     public List<string> Tags { get; set; } = [];
     public required int TimeLimitMs { get; set; } // per test case
     public required int MemoryLimitMb { get; set; }
+
+    /// <summary>
+    /// Language id ("csharp", "python") to the skeleton the editor opens with: the stdin parsing and
+    /// the call into the user's method already written, so a solver writes the algorithm and not the
+    /// I/O boilerplate. Authored under content/questions/&lt;slug&gt;/starters/, empty when a question
+    /// has none authored yet. Keys are not validated against Submissions:SupportedLanguages -- that
+    /// list has one owner, and a key nothing offers is simply never looked up.
+    /// </summary>
+    public Dictionary<string, string> Starters { get; set; } = [];
+
     public List<TestCase> TestCases { get; set; } = [];
 }
 

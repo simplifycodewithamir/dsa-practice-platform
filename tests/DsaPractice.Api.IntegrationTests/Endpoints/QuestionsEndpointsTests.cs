@@ -63,6 +63,40 @@ public class QuestionsEndpointsTests(ApiWebApplicationFactory factory)
     }
 
     [Fact]
+    public async Task GetQuestionBySlug_QuestionWithStarters_ReturnsThemKeyedByLanguage()
+    {
+        var question = TestData.NewQuestion(q => q.Starters = new Dictionary<string, string>
+        {
+            ["csharp"] = "public class Solution\n{\n}\n",
+            ["python"] = "def solve():\n    pass\n"
+        });
+        await TestData.SeedAsync(factory, question);
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync($"/api/v1/questions/{question.Slug}", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var detail = await response.Content.ReadFromJsonAsync<QuestionDetailResponse>(TestJson.Options, TestContext.Current.CancellationToken);
+        Assert.Equal(["csharp", "python"], detail!.Starters.Keys.Order());
+        Assert.Equal("public class Solution\n{\n}\n", detail.Starters["csharp"]);
+    }
+
+    [Fact]
+    public async Task GetQuestionBySlug_QuestionWithNoStarters_ReturnsAnEmptyMapRatherThanNull()
+    {
+        // The editor falls back to a generic skeleton on an empty map; null would be a client crash.
+        var question = TestData.NewQuestion();
+        await TestData.SeedAsync(factory, question);
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync($"/api/v1/questions/{question.Slug}", TestContext.Current.CancellationToken);
+
+        var detail = await response.Content.ReadFromJsonAsync<QuestionDetailResponse>(TestJson.Options, TestContext.Current.CancellationToken);
+        Assert.NotNull(detail!.Starters);
+        Assert.Empty(detail.Starters);
+    }
+
+    [Fact]
     public async Task GetQuestionBySlug_UnknownSlug_Returns404WithNotFoundTitle()
     {
         using var client = factory.CreateClient();
