@@ -453,7 +453,7 @@ docker compose --profile full-stack down
 
 ## See also
 
-- [Design documentation](design/README.md) — what you are stepping through, and why it is shaped that way *(lands with PR #30)*
+- [Design documentation](design/README.md) — what you are stepping through, and why it is shaped that way
 - [Sequence diagrams](design/04-sequence-diagrams.md) — the flows these breakpoints sit on
 - [Low-level design](design/08-low-level-design.md) — the outbox and sandbox algorithms in detail
 - [Sandbox hardening](sandbox-hardening.md) — every control on a sandbox container and what it stops
