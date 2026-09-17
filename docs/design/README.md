@@ -23,7 +23,8 @@ before changing the outbox or the sandbox; both have correctness properties that
 by accident and hard to notice.
 
 To step through any of it with a debugger attached, see [the debugging guide](../debugging.md) —
-these documents say what the code does, that one says how to watch it do it.
+these documents say what the code does, that one says how to watch it do it. What proves it still
+does it is in [testing](../testing.md) and [test cases](../test-cases.md).
 
 Every document describes **what is built today**, not what is planned. Where something is deliberately
 deferred it says so and points at the roadmap item in the root [README](../../README.md), which is
