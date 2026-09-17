@@ -27,6 +27,8 @@ Free DSA question-practice platform, deployed for students. MVP-scoped, sequence
 │   ├── design/                           # HLD, LLD, architecture, use cases, sequence,
 │   │                                     #   class, ER and module-interaction diagrams
 │   ├── debugging.md                      # debugging in VS Code and Visual Studio
+│   ├── testing.md                        # test strategy: unit, integration, component, e2e
+│   ├── test-cases.md                     # hand-executable cases, and where each is automated
 │   └── *.md                              # learning notes (e.g. dsa-containers-design.md)
 ├── frontend/                             # React + TypeScript (not yet scaffolded)
 ├── .github/workflows/dotnet.yml
@@ -480,6 +482,28 @@ before you can look at them.
 
 Start with the [index](docs/design/README.md). Read the low-level design before changing the outbox
 or the sandbox.
+
+## Testing
+
+**206 automated tests**: 164 .NET (xUnit v3 on Microsoft.Testing.Platform), 36 frontend component
+(Vitest), 6 end-to-end (Playwright, nothing stubbed).
+
+| Document | Answers |
+|---|---|
+| [Testing](docs/testing.md) | What each layer covers, why it lives there, how to run it, and what is **not** covered |
+| [Test cases](docs/test-cases.md) | Hand-executable specs — run them manually or write a Playwright test from one. Each says where it is automated |
+
+```bash
+dotnet test --solution source/DsaPractice.slnx     # 164 — MTP mode needs --solution
+cd frontend && npm test                            # 36
+cd frontend && npm run test:e2e                    # 6 — needs the full stack up
+tools/check-starters.sh                            # every starter still compiles
+```
+
+Integration tests need Docker: they start real Postgres, RabbitMQ and sandbox containers through
+Testcontainers, never mocks. `docs/test-cases.md` also carries a
+[regression checklist](docs/test-cases.md#regression-checklist) for a twenty-minute manual pass
+before a release.
 
 ## Conventions
 Follows the user's standard `dotnet-production-code`, `dotnet-testing`, `react-frontend`, `git-workflow` skills, plus the project-specific `dsa-practice-platform` skill for the Judge architecture and MVP scope boundaries. Read the project skill before extending scope past v1 (more languages, leaderboard, etc.) — it's intentionally capped for now.
