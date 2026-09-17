@@ -14,6 +14,18 @@
       "problemMatcher": "$msCompile"
     },
     {
+      "label": "build-migrator",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/source/DataMigrations/DsaPractice.DataMigrations.Postgres/DsaPractice.DataMigrations.Postgres.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
       "label": "build-judge",
       "type": "process",
       "command": "dotnet",

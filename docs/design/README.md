@@ -22,6 +22,9 @@ way to understand a codebase whose interesting behaviour is asynchronous. **08**
 before changing the outbox or the sandbox; both have correctness properties that are easy to break
 by accident and hard to notice.
 
+To step through any of it with a debugger attached, see [the debugging guide](../debugging.md) —
+these documents say what the code does, that one says how to watch it do it.
+
 Every document describes **what is built today**, not what is planned. Where something is deliberately
 deferred it says so and points at the roadmap item in the root [README](../../README.md), which is
 where the sequenced plan and the decisions D1–D11 live. The project skill at

@@ -6,6 +6,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Same id as DsaPractice.Api and the migrations project, so one `dotnet user-secrets set`
+         supplies all three. Without it the Judge has nowhere to read RabbitMq:Uri from locally and
+         fails startup validation, which is what made F5 on this project unusable. It cannot reach
+         the connection string in that same store: it has no DataAccess reference, by decision D7. -->
+    <UserSecretsId>b016cfe2-2a62-4213-a3bb-f012f0d9bb83</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
