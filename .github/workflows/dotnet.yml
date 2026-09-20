@@ -39,6 +39,7 @@ jobs:
         run: |
           dotnet test --project tests/DsaPractice.Api.UnitTests/DsaPractice.Api.UnitTests.csproj --configuration Release --no-build --verbosity normal
           dotnet test --project tests/DsaPractice.ContentSeeding.UnitTests/DsaPractice.ContentSeeding.UnitTests.csproj --configuration Release --no-build --verbosity normal
+          dotnet test --project tests/DsaPractice.Contracts.UnitTests/DsaPractice.Contracts.UnitTests.csproj --configuration Release --no-build --verbosity normal
           dotnet test --project tests/DsaPractice.Judge.UnitTests/DsaPractice.Judge.UnitTests.csproj --configuration Release --no-build --verbosity normal
 
       - name: Frontend build and tests

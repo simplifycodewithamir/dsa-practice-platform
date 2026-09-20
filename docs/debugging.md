@@ -457,3 +457,5 @@ docker compose --profile full-stack down
 - [Sequence diagrams](design/04-sequence-diagrams.md) — the flows these breakpoints sit on
 - [Low-level design](design/08-low-level-design.md) — the outbox and sandbox algorithms in detail
 - [Sandbox hardening](sandbox-hardening.md) — every control on a sandbox container and what it stops
+- [Testing](testing.md) — the suites, and how to run and debug them
+- [Test cases](test-cases.md) — reproduce a bug by hand before reaching for a breakpoint
