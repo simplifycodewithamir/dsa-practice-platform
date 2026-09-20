@@ -3,7 +3,8 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
-import { stubFetchJson } from './test/render';
+import { noAuthSession, stubFetchJson } from './test/render';
+import { SessionContext } from './auth/session';
 
 function renderAt(path: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -11,7 +12,9 @@ function renderAt(path: string) {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[path]}>
-        <App />
+        <SessionContext.Provider value={noAuthSession}>
+          <App />
+        </SessionContext.Provider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
