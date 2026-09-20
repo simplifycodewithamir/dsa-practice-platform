@@ -68,6 +68,17 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DsaPractice: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
       RabbitMq__Uri: "amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672"
+      # Submissions need a signed-in caller. There is no identity provider in front of a local
+      # stack, so this one trusts a symmetric development key from .env instead of an Authority --
+      # mint a matching token with `node tools/mint-dev-token.mjs`, and see docs/auth.md. The Api
+      # refuses to start with a symmetric key when ASPNETCORE_ENVIRONMENT is Production.
+      Auth__RequireAuthentication: "${AUTH_REQUIRE_AUTHENTICATION:-true}"
+      Authentication__Schemes__Bearer__ValidIssuer: "${DEV_JWT_ISSUER}"
+      Authentication__Schemes__Bearer__ValidAudiences__0: "${DEV_JWT_AUDIENCE}"
+      Authentication__Schemes__Bearer__SigningKeys__0__Id: dev
+      Authentication__Schemes__Bearer__SigningKeys__0__Issuer: "${DEV_JWT_ISSUER}"
+      Authentication__Schemes__Bearer__SigningKeys__0__Value: "${DEV_JWT_SIGNING_KEY}"
+      Authentication__Schemes__Bearer__SigningKeys__0__Length: "32"
     depends_on:
       postgres:
         condition: service_healthy

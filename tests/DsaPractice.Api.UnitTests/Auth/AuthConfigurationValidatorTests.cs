@@ -96,6 +96,24 @@ public class AuthConfigurationValidatorTests
         Assert.True(result.Succeeded);
     }
 
+    [Fact]
+    public void ASigningKeyWithNoValue_Fails()
+    {
+        // What a .env missing the DEV_JWT_* lines produces: docker-compose substitutes an empty
+        // string, and the failure would otherwise surface per request rather than at startup.
+        var result = Validate(
+            requireAuthentication: true,
+            settings: new()
+            {
+                ["Authentication:Schemes:Bearer:SigningKeys:0:Issuer"] = "dev",
+                ["Authentication:Schemes:Bearer:SigningKeys:0:Value"] = "",
+                ["Authentication:Schemes:Bearer:ValidAudiences:0"] = "dsa-practice-api"
+            });
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("has an entry with no Value"));
+    }
+
     private static Microsoft.Extensions.Options.ValidateOptionsResult Validate(
         bool requireAuthentication,
         Dictionary<string, string?> settings,

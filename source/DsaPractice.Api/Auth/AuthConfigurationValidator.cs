@@ -16,6 +16,8 @@ namespace DsaPractice.Api.Auth;
 /// is accepted here -- including the identity provider's own userinfo tokens;</item>
 /// <item>a symmetric signing key in production: those exist for local development and the
 /// end-to-end stack, where the key is in a .env file. Anything holding it can mint an admin.</item>
+/// <item>a symmetric signing key entry with no value: a .env missing the DEV_JWT_* lines, which
+/// otherwise fails per request inside token validation rather than once, here.</item>
 /// </list>
 /// </summary>
 internal sealed class AuthConfigurationValidator(IConfiguration configuration, IHostEnvironment environment)
@@ -26,7 +28,18 @@ internal sealed class AuthConfigurationValidator(IConfiguration configuration, I
         var bearer = configuration.GetSection(AuthOptions.BearerSchemeSection);
         var failures = new List<string>();
 
-        var hasSymmetricKeys = bearer.GetSection("SigningKeys").GetChildren().Any();
+        var symmetricKeys = bearer.GetSection("SigningKeys").GetChildren().ToList();
+        var hasSymmetricKeys = symmetricKeys.Count > 0;
+
+        if (symmetricKeys.Any(key => string.IsNullOrWhiteSpace(key["Value"])))
+        {
+            // Usually a .env without the DEV_JWT_* lines: docker-compose substitutes an empty
+            // string and the Api would otherwise fail deep inside token validation, per request,
+            // rather than here with something to act on.
+            failures.Add(
+                $"{AuthOptions.BearerSchemeSection}:SigningKeys has an entry with no Value. " +
+                "Run `node tools/mint-dev-token.mjs` and put its DEV_JWT_* lines in .env.");
+        }
 
         if (options.RequireAuthentication)
         {
