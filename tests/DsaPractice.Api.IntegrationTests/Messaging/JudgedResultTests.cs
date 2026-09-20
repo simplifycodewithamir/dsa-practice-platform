@@ -127,9 +127,7 @@ public class JudgedResultTests(ApiWebApplicationFactory factory)
                 new TestCaseResult(testCaseIds[1], 2, false, "hidden-output", "hidden-error", 11)
             ]));
 
-        using var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", TestTokens.For(OwnerSubject));
+        using var client = factory.CreateAuthenticatedClient(OwnerSubject);
         using var response = await client.GetAsync($"/api/v1/submissions/{submissionId}", TestContext.Current.CancellationToken);
         var body = await response.Content.ReadFromJsonAsync<SubmissionResponse>(TestJson.Options, TestContext.Current.CancellationToken);
 
