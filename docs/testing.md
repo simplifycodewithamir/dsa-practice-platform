@@ -2,8 +2,11 @@
 
 What is tested, at which layer, and why there rather than somewhere else.
 
-**206 automated tests today**: 164 .NET (xUnit v3 on Microsoft.Testing.Platform), 36 frontend
-(Vitest + Testing Library), 6 end-to-end (Playwright, against the whole stack with nothing stubbed).
+**330 automated tests today**: 271 .NET (xUnit v3 on Microsoft.Testing.Platform), 52 frontend
+(Vitest + Testing Library), 7 end-to-end (Playwright, against the whole stack with nothing stubbed).
+
+Counts here are what the runners report, which is what a `[Theory]` expands to rather than how many
+methods are written.
 
 For hand-executable cases — smoke runs, exploratory passes, and the specs the Playwright suite grows
 from — see [test cases](test-cases.md).
@@ -12,10 +15,10 @@ from — see [test cases](test-cases.md).
 
 ```mermaid
 graph TB
-    e2e["<b>End-to-end · 6</b><br/>Playwright · real browser, real Api,<br/>real broker, real containers"]:::e2e
-    integ["<b>Integration · 106</b><br/>Testcontainers: Postgres, RabbitMQ, Docker<br/>WebApplicationFactory"]:::integ
-    comp["<b>Component · 36</b><br/>Vitest + Testing Library<br/>jsdom, fetch stubbed"]:::comp
-    unit["<b>Unit · 58</b><br/>xUnit + Moq · no I/O"]:::unit
+    e2e["<b>End-to-end · 7</b><br/>Playwright · real browser, real Api,<br/>real broker, real containers"]:::e2e
+    integ["<b>Integration · 108</b><br/>Testcontainers: Postgres, RabbitMQ, Docker<br/>WebApplicationFactory"]:::integ
+    comp["<b>Component · 52</b><br/>Vitest + Testing Library<br/>jsdom, fetch stubbed"]:::comp
+    unit["<b>Unit · 163</b><br/>xUnit + Moq · no I/O"]:::unit
 
     unit --> comp --> integ --> e2e
 
@@ -32,10 +35,10 @@ proven with a mock, so the integration layer is deliberately the widest.
 
 | Layer | Count | Runs against | Speed |
 |---|---|---|---|
-| Unit (.NET) | 58 | Nothing external | ~3 s per project |
-| Component (frontend) | 36 | jsdom, `fetch` stubbed | ~5 s |
-| Integration (.NET) | 106 | Real Postgres, RabbitMQ, Docker | 18 s – 80 s per project |
-| End-to-end | 6 | The entire stack | ~20 s |
+| Unit (.NET) | 163 | Nothing external | ~3 s per project |
+| Component (frontend) | 52 | jsdom, `fetch` stubbed | ~5 s |
+| Integration (.NET) | 108 | Real Postgres, RabbitMQ, Docker | 18 s – 80 s per project |
+| End-to-end | 7 | The entire stack | ~20 s |
 
 ## Projects
 
@@ -43,16 +46,17 @@ One test project per production assembly, split by type — never a combined `Fo
 
 | Project | Tests | Covers |
 |---|---|---|
-| `DsaPractice.Api.UnitTests` | 11 | Error-title mapping, `GlobalExceptionHandler`, `JudgeRequestFactory` |
-| `DsaPractice.Api.IntegrationTests` | 53 | Endpoints, auth and ownership, outbox, judged-result recording, database constraints |
+| `DsaPractice.Api.UnitTests` | 56 | Error-title mapping, `GlobalExceptionHandler`, `JudgeRequestFactory`, **bearer configuration validation** |
+| `DsaPractice.Api.IntegrationTests` | 55 | Endpoints, auth and ownership, outbox, judged-result recording, database constraints |
 | `DsaPractice.ContentSeeding.UnitTests` | 23 | `ContentLoader` against real files in a temp folder |
 | `DsaPractice.ContentSeeding.IntegrationTests` | 13 | `QuestionSeeder` against real Postgres with the real migrations |
-| `DsaPractice.Judge.UnitTests` | 24 | `OutputComparer`, `VerdictAggregator`, `ProcessedSubmissions` |
+| `DsaPractice.Contracts.UnitTests` | 19 | The JSON settings the contracts own — enums by name, not ordinal |
+| `DsaPractice.Judge.UnitTests` | 65 | `OutputComparer`, `VerdictAggregator`, `ProcessedSubmissions` |
 | `DsaPractice.Judge.IntegrationTests` | 40 | The Docker sandbox, both language runners, the consumer, **sandbox escapes** |
-| `frontend` (Vitest) | 36 | Pages, components, the generated API client |
-| `frontend/e2e` (Playwright) | 6 | Browse → write → submit → verdict, for real |
+| `frontend` (Vitest) | 52 | Pages, components, the generated API client, the sign-in control |
+| `frontend/e2e` (Playwright) | 7 | Browse → write → submit → verdict, for real |
 
-## Unit tests — 58
+## Unit tests — 163
 
 Fast, isolated, no I/O. They exist for the things that are genuinely a function of their inputs.
 
@@ -69,7 +73,7 @@ Fast, isolated, no I/O. They exist for the things that are genuinely a function 
 folder. Reading a directory tree is its entire job; mocking a filesystem abstraction that exists only
 for the tests would prove less and cost more.
 
-## Integration tests — 106
+## Integration tests — 108
 
 Real Postgres, real RabbitMQ, real Docker, through Testcontainers. Never a mocked database.
 
@@ -90,7 +94,7 @@ Grouped by what they protect:
 | Area | Proves |
 |---|---|
 | Endpoints | Hidden test cases never leave the read API; sample ordering; starters keyed by language; empty map rather than null; 404 for both an unknown slug and a malformed one |
-| Auth | Provisioning on first sight, the same person reusing one row, different people kept apart, a caller **cannot choose** who a submission belongs to, someone else's submission is 404 not 403, an admin can read anyone's, an unreadable token does not inherit an identity |
+| Auth | Provisioning on first sight, the same person reusing one row, different people kept apart, a caller **cannot choose** who a submission belongs to, someone else's submission is 404 not 403, an admin can read anyone's, **submitting without a token is 401 in ProblemDetails**, an unreadable token is rejected rather than treated as anonymous, **reading a question still needs no token**, and with enforcement off a submission still has a real owner |
 | Outbox | The row is written and **nothing** is published inline; an unknown question writes no row; a pass publishes and marks processed; a second pass does not republish; an unroutable message leaves the row pending with backoff and the error recorded; a row not yet due is left alone; the purge deletes only long-processed rows |
 | Judged results | Accepted and failing results applied; **the same result twice leaves the first alone**; an unknown submission is discarded; compilation error stores compile output and no per-test rows; huge output truncated; hidden output never returned |
 | Constraints | Duplicate slug, malformed slug, non-positive limits, duplicate ordinal, the same ordinal on different questions, unknown-question FK, and the verdict-iff-completed check — asserted against the database, because the seeder and the result consumer bypass the Api's validators |
@@ -122,7 +126,7 @@ The widest suite, because it is where untrusted code runs.
 control in [sandbox hardening](sandbox-hardening.md) has an assertion here; a control that is only
 described and not asserted is a control that will quietly stop working.
 
-## Component tests — 36
+## Component tests — 52
 
 Vitest, Testing Library, jsdom. `fetch` is stubbed via `stubFetchJson`; the real API is not involved.
 
@@ -134,11 +138,12 @@ owns — language choice, starters, submitting, polling, showing the verdict —
 |---|---|
 | `QuestionsPage` | Lists with difficulty, links by slug, filters by difficulty and by topic (offering only topics that exist), says so when nothing matches, reports a failure rather than showing an empty list |
 | `QuestionPage` | Title, difficulty and the limits the Judge enforces; statement rendered as markdown; every sample with input and output; a 404 explained in its own terms; other failures reported as failures |
-| `SubmitPanel` | Submits the chosen language and edited code with **no `userId`**; polls until judged; disabled while judging; cannot submit an empty editor; keeps code the user wrote across a language change; opens with the question's starter; swaps starters when untouched; falls back to a generic skeleton; submits a partly-filled starter |
+| `SubmitPanel` | Submits the chosen language and edited code with **no `userId`**; polls until judged; disabled while judging; cannot submit an empty editor; keeps code the user wrote across a language change; opens with the question's starter; swaps starters when untouched; falls back to a generic skeleton; submits a partly-filled starter; **a signed-out visitor is asked to sign in rather than submitted for**, and can still read and edit; a 401 reads as an expired session, not a rejected solution |
 | `VerdictPanel` | Says it is judging while pending; spells verdicts out for a person; says a judge error is not the submitter's fault; each test case with its time; **never shows output for a hidden case**; compiler output when the code never ran |
-| `client` | Requests the collection; **escapes the slug** so a crafted value cannot alter the path; sends JSON; throws an `ApiError` carrying the `ProblemDetails`; still fails usefully when the error body is not JSON |
+| `client` | Requests the collection; **escapes the slug** so a crafted value cannot alter the path; sends JSON; **attaches the access token, re-read per request so a renewed one is used**; sends no `authorization` header when nobody is signed in; throws an `ApiError` carrying the `ProblemDetails`; still fails usefully when the error body is not JSON |
+| `SignInControl` | Renders nothing with no provider configured; signs in and **comes back to the question you were reading**; shows who is signed in and signs them out; says nothing about being signed out mid-redirect |
 
-## End-to-end — 6
+## End-to-end — 7
 
 Playwright against the real stack: the built frontend, the real Api, RabbitMQ, and a Judge that
 really runs the submitted code in a container. Nothing stubbed, which is the point — a failure here
@@ -152,6 +157,7 @@ means a student would have hit it.
 | A wrong solution is rejected | The verdict, and the student's own output shown back |
 | A crash is a runtime error | Not misreported as a wrong answer |
 | Difficulty filtering | The list narrows |
+| The Api refuses an unidentified caller | Straight to the Api, no token, 401 — every other test only proves the browser *sends* a token |
 
 Typing into Monaco goes through the **clipboard**, not keystrokes: it auto-indents and auto-closes
 brackets, so typing Python character by character produces mangled code.
@@ -179,8 +185,18 @@ cd frontend && npm run build && npm run test:e2e
 > `docker ps -a --filter label=org.testcontainers=true` shows any that survived.
 
 > **Playwright on this machine** needs system libraries installed with
-> `sudo npx playwright install-deps`. Until then, run the suite through the
-> `mcr.microsoft.com/playwright` image.
+> `sudo npx playwright install-deps`. Until then, run the suite through Playwright's own image,
+> which needs no root and installs nothing:
+>
+> ```bash
+> docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -e npm_config_cache=/tmp/.npm -e CI=1 \
+>   -v "$PWD:/repo" -w /repo/frontend --network host mcr.microsoft.com/playwright:v1.49.0-noble \
+>   sh -lc "npx playwright test"
+> ```
+
+> **The end-to-end stack enforces authentication**, so it needs a development token:
+> `node tools/mint-dev-token.mjs`, its `DEV_JWT_*` lines in `.env` and its `VITE_` line in
+> `frontend/.env.local`, before `npm run build`. See [auth](auth.md).
 
 [The debugging guide](debugging.md#debugging-tests) covers stepping through a failing test.
 
