@@ -76,6 +76,65 @@ public class VerdictAggregatorTests
         Assert.Equal(42, single.ExecutionTimeMs);
     }
 
+    [Fact]
+    public void Aggregate_NoTestCasesAndNoCompilationFailure_IsAccepted()
+    {
+        // Vacuously accepted. Pinned deliberately: a question is authored with at least one sample,
+        // so an empty outcome means something upstream dropped the test cases -- and if that ever
+        // happens, this is the behaviour to come back and change.
+        var result = VerdictAggregator.Aggregate(SubmissionId, new ExecutionOutcome([]));
+
+        Assert.Equal(JudgeVerdict.Accepted, result.Verdict);
+        Assert.Empty(result.TestCaseResults);
+    }
+
+    [Fact]
+    public void Aggregate_StopsAtTheFirstFailure_ReportsOnlyWhatActuallyRan()
+    {
+        // The executor stops running after a failure, so the result carries fewer test cases than
+        // the question has. The verdict still comes from the one that failed.
+        var outcome = new ExecutionOutcome([Outcome(1, TestCaseStatus.Passed), Outcome(2, TestCaseStatus.RuntimeError)]);
+
+        var result = VerdictAggregator.Aggregate(SubmissionId, outcome);
+
+        Assert.Equal(JudgeVerdict.RuntimeError, result.Verdict);
+        Assert.Equal(2, result.TestCaseResults.Count);
+    }
+
+    [Fact]
+    public void Aggregate_CompilationFailed_DiscardsAnyTestOutcomesThatCameWithIt()
+    {
+        // Nothing can have run, so anything in the list is stale and must not reach the user.
+        var outcome = new ExecutionOutcome(
+            [Outcome(1, TestCaseStatus.Passed)], CompileOutput: "error CS1002", CompilationFailed: true);
+
+        var result = VerdictAggregator.Aggregate(SubmissionId, outcome);
+
+        Assert.Equal(JudgeVerdict.CompilationError, result.Verdict);
+        Assert.Empty(result.TestCaseResults);
+    }
+
+    [Fact]
+    public void Aggregate_CarriesTheSubmissionIdItWasGiven()
+    {
+        // The Api matches the result back to a submission by this and nothing else.
+        var submissionId = Guid.NewGuid();
+
+        var result = VerdictAggregator.Aggregate(submissionId, new ExecutionOutcome([Outcome(1, TestCaseStatus.Passed)]));
+
+        Assert.Equal(submissionId, result.SubmissionId);
+    }
+
+    [Fact]
+    public void Aggregate_PassingRun_CarriesNoErrorMessages()
+    {
+        var outcome = new ExecutionOutcome([Outcome(1, TestCaseStatus.Passed)]);
+
+        var result = VerdictAggregator.Aggregate(SubmissionId, outcome);
+
+        Assert.All(result.TestCaseResults, r => Assert.Null(r.ErrorMessage));
+    }
+
     private static TestCaseOutcome Outcome(int ordinal, TestCaseStatus status) =>
         new(Guid.NewGuid(), ordinal, status, ActualOutput: "out", ErrorMessage: null, ExecutionTimeMs: 1);
 }
