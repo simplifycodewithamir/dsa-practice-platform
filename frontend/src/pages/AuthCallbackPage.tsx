@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useAuth } from 'react-oidc-context';
-import { Link } from 'react-router';
 
 /**
  * Where the identity provider sends the browser back with an authorization code.
