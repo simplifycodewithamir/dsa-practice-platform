@@ -64,8 +64,25 @@ Nothing below is code. Set it up once in the dashboard.
 
 ### 1 · Tenant
 
-Create a tenant; its region decides the issuer URL, which is
+There is no separate "create tenant" step for your first one: **signing up creates it**. Go to
+[auth0.com/signup](https://auth0.com/signup) and sign in with Google or GitHub — no card is asked
+for on the free plan.
+
+Signup then asks for the two things that are **permanent**:
+
+| | |
+|---|---|
+| **Tenant name** | lowercase letters, numbers and hyphens, 3–63 characters, globally unique — e.g. `dsa-practice`. It **cannot be changed**, or reused after the tenant is deleted. |
+| **Region** | AU, CA, EU, JP, UK or US. Pick the one closest to your users; there is no India region, so EU or AU. The sub-locality (`eu-2`, `us-3`, …) is assigned for you. |
+
+Both become the domain, and the domain is the issuer:
 `https://<tenant>.<region>.auth0.com/` — **the trailing slash matters**, discovery fails without it.
+
+Anything else signup asks (use case, company size) is marketing, not configuration.
+
+A second tenant, later, is the dropdown at the top left of the dashboard → *Create tenant*. Auth0
+recommends one per environment; this project does not need one until there is something deployed
+to keep separate from local development.
 
 ### 2 · An API (this is the audience)
 
