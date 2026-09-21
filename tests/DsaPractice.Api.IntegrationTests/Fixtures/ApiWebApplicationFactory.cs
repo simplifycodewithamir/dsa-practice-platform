@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using DsaPractice.DataAccess;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -40,6 +41,20 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>, I
         _rabbitMqConnection = await factory.CreateConnectionAsync();
     }
 
+    /// <summary>
+    /// A client that is signed in as <paramref name="subject"/>, defaulting to someone nobody else
+    /// in the suite is. Submissions require a token since item 20, so this is what most tests need;
+    /// <see cref="WebApplicationFactory{TEntryPoint}.CreateClient()" /> is still the anonymous caller.
+    /// </summary>
+    public HttpClient CreateAuthenticatedClient(string? subject = null, string? name = null)
+    {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", TestTokens.For(subject ?? $"user-{Guid.NewGuid():N}", name));
+
+        return client;
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
@@ -57,7 +72,10 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>, I
             ["Authentication:Schemes:Bearer:SigningKeys:0:Length"] = "32",
             // Tests drive OutboxProcessor directly so they assert what a relay pass does instead of
             // racing its timer. The loop around it is covered by starting the app at all.
-            ["Outbox:RelayEnabled"] = "false"
+            ["Outbox:RelayEnabled"] = "false",
+            // Explicit rather than relying on the default: enforcement being on is the thing most
+            // of these tests are written against, so it belongs in the fixture where it is visible.
+            ["Auth:RequireAuthentication"] = "true"
         }));
 
         builder.ConfigureServices(services =>

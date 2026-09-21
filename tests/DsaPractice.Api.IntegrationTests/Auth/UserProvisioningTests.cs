@@ -6,7 +6,9 @@ using DsaPractice.Api.IntegrationTests.Fixtures;
 using DsaPractice.DataAccess;
 using DsaPractice.DataAccess.Entities;
 using DsaPractice.DataAccess.Enums;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -128,23 +130,25 @@ public class UserProvisioningTests(ApiWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task Submitting_WithoutAToken_IsAttributedToTheLocalUser()
+    public async Task Submitting_WithoutAToken_Returns401()
     {
         var question = await TestData.SeedAsync(factory, TestData.NewQuestion());
+        using var client = factory.CreateClient();
 
-        // Auth:RequireAuthentication is off until item 20 gives the browser somewhere to get a
-        // token; the submission still belongs to a real user row, so the foreign key holds.
-        var submission = await SubmitAsync(question.Id, token: null);
+        using var response = await client.PostAsJsonAsync(
+            "/api/v1/submissions",
+            new CreateSubmissionRequest(question.Id, "python", "print(1)"),
+            TestContext.Current.CancellationToken);
 
-        using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<DsaPracticeDbContext>();
-        var user = await db.Users.AsNoTracking().SingleAsync(u => u.Id == submission.UserId, TestContext.Current.CancellationToken);
-        Assert.Equal("local-development", user.Issuer);
-        Assert.Equal("anonymous", user.Subject);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        // A 401 never throws, so it reaches the client through UseStatusCodePages -- this asserts
+        // it still comes back as a ProblemDetails body like every other failure, not as nothing.
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(TestContext.Current.CancellationToken);
+        Assert.Equal("api.error.unauthorized", problem!.Title);
     }
 
     [Fact]
-    public async Task AnUnreadableToken_DoesNotGetSomeoneElsesIdentity()
+    public async Task AnUnreadableToken_Returns401()
     {
         var question = await TestData.SeedAsync(factory, TestData.NewQuestion());
         using var client = factory.CreateClient();
@@ -155,16 +159,49 @@ public class UserProvisioningTests(ApiWebApplicationFactory factory)
             new CreateSubmissionRequest(question.Id, "python", "print(1)"),
             TestContext.Current.CancellationToken);
 
-        // While Auth:RequireAuthentication is off, a junk token is simply not an identity: the
-        // request is treated as anonymous rather than rejected. Item 20 turns the flag on, and the
-        // same request then gets a 401 -- which is why this asserts on who it was attributed to
-        // rather than on the status code.
+        // Junk is not an identity, and since item 20 it is not anonymous access either.
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ReadingAQuestion_NeedsNoToken()
+    {
+        var question = await TestData.SeedAsync(factory, TestData.NewQuestion());
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync($"/api/v1/questions/{question.Slug}", TestContext.Current.CancellationToken);
+
+        // The question bank is the public, indexable half of the product (decision D10): requiring
+        // a login to read a problem statement would cost the organic traffic the site runs on.
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task WithEnforcementOff_SubmittingWithoutAToken_IsAttributedToTheLocalUser()
+    {
+        // The escape hatch behind Auth:RequireAuthentication: the end-to-end stack and a developer
+        // who has not configured an issuer yet still get a submission that belongs to a real user
+        // row, so the foreign key holds. Same containers as the parent factory, different config.
+        using var anonymousFactory = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(
+                new Dictionary<string, string?> { ["Auth:RequireAuthentication"] = "false" })));
+
+        var question = await TestData.SeedAsync(factory, TestData.NewQuestion());
+        using var client = anonymousFactory.CreateClient();
+
+        using var response = await client.PostAsJsonAsync(
+            "/api/v1/submissions",
+            new CreateSubmissionRequest(question.Id, "python", "print(1)"),
+            TestContext.Current.CancellationToken);
+
         response.EnsureSuccessStatusCode();
         var created = await response.Content.ReadFromJsonAsync<SubmissionResponse>(TestJson.Options, TestContext.Current.CancellationToken);
+
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DsaPracticeDbContext>();
         var user = await db.Users.AsNoTracking().SingleAsync(u => u.Id == created!.UserId, TestContext.Current.CancellationToken);
         Assert.Equal("local-development", user.Issuer);
+        Assert.Equal("anonymous", user.Subject);
     }
 
     private async Task<SubmissionResponse> SubmitAsync(Guid questionId, string? token)

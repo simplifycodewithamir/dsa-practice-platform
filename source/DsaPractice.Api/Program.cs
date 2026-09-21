@@ -6,6 +6,7 @@ using DsaPractice.DataAccess;
 using DsaPractice.Api.Endpoints;
 using DsaPractice.Api.Exceptions;
 using DsaPractice.Api.Messaging;
+using DsaPractice.Api.OpenApi;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using DsaPractice.Api.Services;
@@ -49,7 +50,11 @@ builder.Services.AddSingleton(TimeProvider.System);
 // Explicit registration, not AddValidatorsFromAssemblyContaining<Program>() --
 // its assembly scan doesn't reliably discover internal IValidator<T> implementations.
 builder.Services.AddScoped<IValidator<CreateSubmissionRequest>, CreateSubmissionRequestValidator>();
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+    options.AddOperationTransformer<BearerSecurityRequirementTransformer>();
+});
 
 builder.Services.AddOptions<SubmissionsOptions>()
     .Bind(builder.Configuration.GetSection(SubmissionsOptions.SectionName))
@@ -59,13 +64,23 @@ builder.Services.AddOptions<SubmissionsOptions>()
 builder.Services.AddOptions<AuthOptions>()
     .Bind(builder.Configuration.GetSection(AuthOptions.SectionName))
     .ValidateOnStart();
+// Refuses a startup whose bearer configuration would silently let everyone -- or no one -- in.
+builder.Services.AddSingleton<IValidateOptions<AuthOptions>, AuthConfigurationValidator>();
 
 // Resource-server only (decision D3): this validates tokens, it does not issue them. Everything
-// comes from configuration under Authentication:Schemes:Bearer, which is exactly what
-// `dotnet user-jwts` writes for local development (D4) and what an identity provider's
-// Authority/JWKS settings slot into at item 20 -- so there is no token-minting code here to
-// accidentally ship.
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
+// comes from configuration under Authentication:Schemes:Bearer -- `Authority` points at the
+// identity provider, and the signing keys are fetched from its JWKS endpoint and refreshed on
+// rotation, so no key material is deployed with the Api. The same section is what
+// `dotnet user-jwts` writes for local development (D4), so there is no token-minting code here to
+// accidentally ship. See docs/auth.md.
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        // Keep the token's own claim names. With the default mapping `sub` arrives as the far
+        // longer ClaimTypes.NameIdentifier URI, and the code that reads identity (CurrentUserProvider)
+        // would be matching on a WS-Federation-era alias for a claim OIDC already names.
+        options.MapInboundClaims = false;
+    });
 builder.Services.AddAuthorization();
 
 builder.Services.AddHttpContextAccessor();
@@ -132,16 +147,16 @@ app.UseHttpsRedirection();
 app.UseCors();
 
 // Populates HttpContext.User from a bearer token when one is present, whether or not the endpoint
-// requires it -- which is what lets submissions be attributed before enforcement is switched on.
+// requires it -- which is what lets a submission be attributed even where authorization is off.
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGroup("/api/v1/questions").MapQuestionsEndpoints();
 var submissions = app.MapGroup("/api/v1/submissions").MapSubmissionsEndpoints();
 
-// Off until item 20 gives the browser somewhere to get a token from; enforcing it now would only
-// mean nobody can submit. Everything else -- validating a token that is present, provisioning the
-// user, owner-or-admin on reads -- is already in effect.
+// On by default since item 20. It stays configurable so the end-to-end stack and a developer who
+// has not set an issuer up yet can turn it off deliberately; AuthConfigurationValidator makes
+// leaving it on with a broken issuer configuration a failed startup rather than a silent 401 wall.
 if (app.Services.GetRequiredService<IOptions<AuthOptions>>().Value.RequireAuthentication)
 {
     submissions.RequireAuthorization();

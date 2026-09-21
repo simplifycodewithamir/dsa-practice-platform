@@ -27,7 +27,7 @@ public class OutboxTests(ApiWebApplicationFactory factory)
     {
         await MessagingState.ResetAsync(factory);
         var question = await SeedQuestionAsync();
-        using var client = factory.CreateClient();
+        using var client = factory.CreateAuthenticatedClient();
 
         using var response = await client.PostAsJsonAsync(
             "/api/v1/submissions",
@@ -56,7 +56,7 @@ public class OutboxTests(ApiWebApplicationFactory factory)
     {
         await MessagingState.ResetAsync(factory);
         var before = await CountOutboxRowsAsync();
-        using var client = factory.CreateClient();
+        using var client = factory.CreateAuthenticatedClient();
 
         using var response = await client.PostAsJsonAsync(
             "/api/v1/submissions",

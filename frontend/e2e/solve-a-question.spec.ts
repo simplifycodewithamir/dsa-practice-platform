@@ -19,6 +19,9 @@ for i, x in enumerate(a):
     seen.setdefault(x, i)
 `;
 
+/** The Api itself, for the one assertion that has to bypass the browser entirely. */
+const apiBaseUrl = process.env.E2E_API_BASE_URL ?? 'http://localhost:8080';
+
 /** Types into Monaco, which owns its own DOM and ignores a plain fill(). */
 async function writeSolution(page: Page, source: string) {
   const editor = page.locator('.monaco-editor').first();
@@ -104,4 +107,20 @@ test('filtering the list by difficulty narrows it', async ({ page }) => {
 
   await expect(page.getByRole('link', { name: /Maximum Subarray Sum/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /Two Sum/ })).toBeHidden();
+});
+
+test('the Api refuses a submission from a caller it cannot identify', async ({ request }) => {
+  // Every other test here submits successfully, which only proves the browser is sending a token.
+  // This proves the Api would have rejected it otherwise -- straight to the Api, no token, no
+  // browser. Without it, an Api that had stopped enforcing anything would pass this whole suite.
+  const questions = await request.get(`${apiBaseUrl}/api/v1/questions`);
+  expect(questions.ok()).toBeTruthy(); // reading the bank stays public: it is what search engines index
+
+  const response = await request.post(`${apiBaseUrl}/api/v1/submissions`, {
+    data: { questionId: (await questions.json())[0].id, language: 'python', sourceCode: 'print(1)' },
+  });
+
+  expect(response.status()).toBe(401);
+  // And it says so the same way every other failure does, rather than returning nothing.
+  expect((await response.json()).title).toBe('api.error.unauthorized');
 });

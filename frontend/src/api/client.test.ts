@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, api } from './client';
+import { ApiError, api, setAccessTokenProvider } from './client';
 
 describe('api client', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    setAccessTokenProvider(undefined);
   });
 
   function stubFetch(response: Partial<Response> & { json: () => Promise<unknown> }) {
@@ -38,6 +39,39 @@ describe('api client', () => {
     expect(init.method).toBe('POST');
     expect(init.headers['content-type']).toBe('application/json');
     expect(JSON.parse(init.body)).toEqual(submission);
+  });
+
+  it('sends the access token when the app is signed in', async () => {
+    const fetchMock = stubFetch({ json: async () => ({}) });
+    setAccessTokenProvider(() => 'a.b.c');
+
+    await api.createSubmission({ questionId: 'q1', language: 'python', sourceCode: 'print(1)' });
+
+    expect(fetchMock.mock.calls[0][1].headers.authorization).toBe('Bearer a.b.c');
+  });
+
+  it('reads the token per request, so a renewed one is used without re-wiring anything', async () => {
+    const fetchMock = stubFetch({ json: async () => [] });
+    let token = 'first';
+    setAccessTokenProvider(() => token);
+
+    await api.listQuestions();
+    token = 'renewed';
+    await api.listQuestions();
+
+    expect(fetchMock.mock.calls[0][1].headers.authorization).toBe('Bearer first');
+    expect(fetchMock.mock.calls[1][1].headers.authorization).toBe('Bearer renewed');
+  });
+
+  it('sends no authorization header when nobody is signed in', async () => {
+    // The question bank is public; an empty "Bearer " header would be a malformed request, and a
+    // stale one would be worse.
+    const fetchMock = stubFetch({ json: async () => [] });
+    setAccessTokenProvider(() => undefined);
+
+    await api.listQuestions();
+
+    expect(fetchMock.mock.calls[0][1].headers.authorization).toBeUndefined();
   });
 
   it('throws an ApiError carrying the ProblemDetails the Api returned', async () => {

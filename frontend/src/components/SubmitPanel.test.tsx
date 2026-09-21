@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import SubmitPanel from './SubmitPanel';
-import { renderPage, stubFetchJson } from '../test/render';
+import { renderPage, signedInSession, signedOutSession, stubFetchJson } from '../test/render';
 
 // Monaco needs a real canvas, which jsdom has not got. The editor is a controlled textarea here so
 // the tests can exercise what this component is actually responsible for: language choice,
@@ -126,5 +126,48 @@ describe('SubmitPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Submit' }));
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('An unexpected error occurred.'));
+  });
+
+  it('asks a signed-out visitor to sign in rather than submitting for them', async () => {
+    const fetchMock = stubFetchJson({ body: pending });
+    const session = signedOutSession();
+    renderPage(<SubmitPanel questionId="q1" starters={starters} />, { session, path: '/problems/two-sum', route: '/problems/:slug' });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in to submit' }));
+
+    expect(session.signIn).toHaveBeenCalledWith('/problems/two-sum');
+    // Nothing was sent: a 401 would be a worse way to discover you are not signed in.
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('lets a signed-out visitor read and edit the question anyway', async () => {
+    // Only submitting needs an account. Being asked to sign in before you can even try the editor
+    // is how a practice site loses the person who arrived from a search result.
+    renderPage(<SubmitPanel questionId="q1" starters={starters} />, { session: signedOutSession() });
+
+    await userEvent.type(screen.getByLabelText('Source code'), 'print(1)');
+
+    expect(screen.getByLabelText('Source code')).toHaveValue('# python starter\nprint(1)');
+  });
+
+  it('submits normally once signed in', async () => {
+    const fetchMock = stubFetchJson({ body: pending }, { body: accepted });
+    renderPage(<SubmitPanel questionId="q1" />, { session: signedInSession() });
+
+    await userEvent.type(screen.getByLabelText('Source code'), 'print(1)');
+    await userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+  });
+
+  it('says a rejected submission was the session expiring, not the code', async () => {
+    stubFetchJson({ status: 401, body: { title: 'api.error.unauthorized', status: 401 } });
+    renderPage(<SubmitPanel questionId="q1" />, { session: signedInSession() });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Your session has expired'));
+    // And the code they wrote is still in the editor to resubmit.
+    expect(screen.getByLabelText('Source code')).toHaveValue('# Read from stdin, print the answer.\n');
   });
 });

@@ -34,12 +34,28 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Where the bearer token comes from. The auth layer pushes it in, because this module is not a
+ * component and cannot read a hook -- and because a React Query `mutationFn` cannot either.
+ *
+ * Only ever sent to `baseUrl`, which is this Api: a token minted for one audience must not be
+ * handed to whatever else the app might one day call.
+ */
+let accessTokenProvider: (() => string | undefined) | undefined;
+
+export function setAccessTokenProvider(provider: (() => string | undefined) | undefined) {
+  accessTokenProvider = provider;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const accessToken = accessTokenProvider?.();
+
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {
       accept: 'application/json',
       ...(init?.body ? { 'content-type': 'application/json' } : {}),
+      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
       ...init?.headers,
     },
   });
