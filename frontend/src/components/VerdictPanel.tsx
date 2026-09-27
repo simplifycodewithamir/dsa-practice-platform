@@ -1,6 +1,5 @@
-import type { Submission, Verdict } from '../api/client';
-
-type KnownVerdict = NonNullable<Verdict>;
+import type { Submission } from '../api/client';
+import { verdictLabels, type KnownVerdict } from './verdictLabels';
 
 const verdictStyles: Partial<Record<KnownVerdict, string>> = {
   Accepted: 'bg-emerald-50 text-emerald-800 ring-emerald-600/20',
@@ -12,14 +11,12 @@ const verdictStyles: Partial<Record<KnownVerdict, string>> = {
   InternalError: 'bg-slate-100 text-slate-800 ring-slate-500/20',
 };
 
-/** Spelled out, because "TimeLimitExceeded" is a wire value, not something to show a student. */
-const verdictLabels: Partial<Record<KnownVerdict, string>> = {
-  Accepted: 'Accepted',
-  WrongAnswer: 'Wrong answer',
-  TimeLimitExceeded: 'Time limit exceeded',
-  MemoryLimitExceeded: 'Memory limit exceeded',
-  RuntimeError: 'Runtime error',
-  CompilationError: 'Compilation error',
+/**
+ * Right after submitting, a judge error needs saying differently than it does in a history table:
+ * the person is waiting on this one result and has just been told something went wrong.
+ */
+const labels: Record<KnownVerdict, string> = {
+  ...verdictLabels,
   InternalError: 'Judge error — not your fault, try again',
 };
 
@@ -42,7 +39,7 @@ export default function VerdictPanel({ submission }: { submission: Submission })
         role="status"
         className={`inline-flex rounded-md px-2 py-1 text-sm font-semibold ring-1 ring-inset ${verdictStyles[verdict]}`}
       >
-        {verdictLabels[verdict] ?? verdict}
+        {labels[verdict] ?? verdict}
       </p>
 
       {submission.compileOutput && (
