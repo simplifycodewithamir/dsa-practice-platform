@@ -72,17 +72,25 @@ Signup then asks for the two things that are **permanent**:
 
 | | |
 |---|---|
-| **Tenant name** | lowercase letters, numbers and hyphens, 3–63 characters, globally unique — e.g. `dsa-practice`. It **cannot be changed**, or reused after the tenant is deleted. |
+| **Tenant name** | lowercase letters, numbers and hyphens, 3–63 characters, globally unique. Signup may assign one (`dev-xxxxxxxx`) instead of asking. Either way it **cannot be changed** afterwards, or reused after the tenant is deleted — and the free plan cannot delete a tenant or create a second one, so whatever signup gives you is permanent. It is cosmetic: it appears only inside the issuer URL, which every consumer reads from configuration. |
 | **Region** | AU, CA, EU, JP, UK or US. Pick the one closest to your users; there is no India region, so EU or AU. The sub-locality (`eu-2`, `us-3`, …) is assigned for you. |
 
 Both become the domain, and the domain is the issuer:
 `https://<tenant>.<region>.auth0.com/` — **the trailing slash matters**, discovery fails without it.
+This project's tenant is `dev-s4cf7y7mvj0ejgti` in `us`, so its issuer is
+`https://dev-s4cf7y7mvj0ejgti.us.auth0.com/`. That is not a secret; it ships in the SPA bundle.
 
 Anything else signup asks (use case, company size) is marketing, not configuration.
 
-A second tenant, later, is the dropdown at the top left of the dashboard → *Create tenant*. Auth0
-recommends one per environment; this project does not need one until there is something deployed
-to keep separate from local development.
+The free plan allows **one tenant** — *Create tenant* in the dropdown at the top left of the
+dashboard needs a paid plan. Auth0 recommends a tenant per environment, but this project does not
+need one until there is something deployed to keep separate from local development.
+
+One tenant is not one application. Another project is another entry under *Applications* plus its
+own API identifier in the same tenant — separate client id, callback URLs and audience, so a token
+minted for this Api is not accepted by that one. Users are the exception: they are tenant-wide
+unless each application is given its own database connection (*Authentication → Database*, then
+enable that connection only for its application).
 
 ### 2 · An API (this is the audience)
 
@@ -129,7 +137,7 @@ All of it is configuration — `Authentication:Schemes:Bearer` is bound by `AddJ
 
 ```bash
 Auth__RequireAuthentication=true
-Authentication__Schemes__Bearer__Authority=https://<tenant>.<region>.auth0.com/
+Authentication__Schemes__Bearer__Authority=https://dev-s4cf7y7mvj0ejgti.us.auth0.com/
 Authentication__Schemes__Bearer__ValidAudiences__0=https://api.<your-domain>
 ```
 
@@ -150,7 +158,7 @@ an admin, and no provider's configuration mistake can grant it.
 `frontend/.env.local` (copy `frontend/.env.example`):
 
 ```bash
-VITE_OIDC_AUTHORITY=https://<tenant>.<region>.auth0.com/
+VITE_OIDC_AUTHORITY=https://dev-s4cf7y7mvj0ejgti.us.auth0.com/
 VITE_OIDC_CLIENT_ID=<the SPA application's client id>
 VITE_OIDC_AUDIENCE=https://api.<your-domain>
 ```
