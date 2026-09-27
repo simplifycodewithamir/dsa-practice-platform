@@ -23,9 +23,11 @@ Free DSA question-practice platform, deployed for students. MVP-scoped, sequence
 │   ├── DsaPractice.ContentSeeding.IntegrationTests/
 │   └── DsaPractice.Judge.UnitTests/
 ├── content/questions/<slug>/             # authored questions — see "Authoring a question"
+├── tools/                                # repo scripts (dev token minting, starter checks)
 ├── docs/
 │   ├── design/                           # HLD, LLD, architecture, use cases, sequence,
 │   │                                     #   class, ER and module-interaction diagrams
+│   ├── auth.md                           # identity provider setup, PKCE/JWKS, local dev tokens
 │   ├── debugging.md                      # debugging in VS Code and Visual Studio
 │   ├── testing.md                        # test strategy: unit, integration, component, e2e
 │   ├── test-cases.md                     # hand-executable cases, and where each is automated
@@ -101,7 +103,7 @@ Not final — revisit any row whose *why* stops holding.
 |---|---|---|
 | D1 | Host everything on **one free ARM VM** (Oracle Cloud Always Free, Ampere A1) running `docker compose` | The Judge needs a Docker daemon to spawn sandboxes; free PaaS tiers (App Service, Render, Railway, …) don't give you one. Consequence: images must build for `linux/arm64`. Fallback: Hetzner CAX11 (~€4/mo). |
 | D2 | **Cloudflare** in front: DNS, TLS, Tunnel, Pages (frontend), R2 (backups), Turnstile | All free. The Tunnel means the VM has no inbound HTTP ports open, and there is no reverse proxy or certificate renewal to run yourself. |
-| D3 | **Managed OIDC identity provider**. The Api is only a resource server; the SPA uses Authorization Code + PKCE; a thin local `Users` table with an internal `Guid` id, mapped from the token's `(iss, sub)` | No password storage, reset emails, MFA or bot-signup handling to own and get wrong on a public domain. Free tiers cover far more than MVP traffic. The internal id means switching IdP never orphans anyone's history. The IdP itself is picked in item 20 after a fresh pricing check. |
+| D3 | **Managed OIDC identity provider** — **Auth0**, chosen in item 20. The Api is only a resource server; the SPA uses Authorization Code + PKCE; a thin local `Users` table with an internal `Guid` id, mapped from the token's `(iss, sub)` | No password storage, reset emails, MFA or bot-signup handling to own and get wrong on a public domain. Auth0's free tier (25k MAU, no card) covers far more than MVP traffic, does Google and GitHub out of the box, and is plain OIDC — so it is `Authority` + audience in configuration, not an SDK the app is built around. The internal id means switching provider never orphans anyone's history. Setup and alternatives considered: `docs/auth.md`. |
 | D4 | Local dev tokens via **`dotnet user-jwts`**; no token-minting code in the Api | Built into the SDK and config-only (`Authentication:Schemes:Bearer`), so the production binary contains no dev-token endpoint that could ever be exposed. |
 | D5 | **`RabbitMQ.Client` directly**, no MassTransit | You learn the real primitives (exchanges, acks, prefetch, dead-lettering, publisher confirms). MassTransit v9+ is also commercially licensed. |
 | D6 | **Transactional outbox** for Api → RabbitMQ | Saving a submission and publishing its message touch two systems. Without an outbox, a crash between the two loses the message (submission stuck `Pending` forever) or the retry duplicates it. |
@@ -199,7 +201,34 @@ were in boilerplate rather than in anyone's algorithm.
 - `tools/check-starters.sh` builds every starter with the Judge's own runner images and compile
   command, read out of its `appsettings.json`. A starter that doesn't compile is worse than none.
 
-20. **Real IdP + SPA login** — choose the IdP after a fresh free-tier check (Microsoft Entra External ID, Auth0, Clerk, self-hosted Keycloak); Google + GitHub login first; the Api validates via `Authority` (JWKS, RS256); the SPA uses Authorization Code + PKCE with the access token held in memory. A BFF (tokens server-side, HttpOnly cookie) is the stricter option — revisit after launch.
+20. **Real IdP + SPA login** — signing in is real: Authorization Code + PKCE in the browser, tokens
+    validated against the provider's JWKS in the Api, and `Auth:RequireAuthentication` on by
+    default. Setup, configuration and the flow are documented in `docs/auth.md`.
+    - **Auth0**, after the free-tier check the decision was waiting on: 25,000 MAU free with no
+      card, Google *and* GitHub as one-click connections, and a plain OIDC provider — so the Api is
+      `Authority` + audience and nothing else. Entra External ID's larger free tier needs a linked
+      Azure subscription and has no built-in GitHub connection; Clerk's SDK owns the flow, which
+      makes replacing it a rewrite rather than a configuration change; self-hosted Keycloak puts
+      login availability on the same VM as the judge.
+    - **No code changed to point at a provider** (D4 holds): `AddJwtBearer()` binds
+      `Authentication:Schemes:Bearer` itself, and the signing keys are fetched from JWKS, so key
+      rotation needs no deployment and no key material ships with the Api.
+    - **Misconfiguration is a failed startup, not a silent change of who gets in.** Enforcement on
+      with no issuer (every request 401s forever), no audience (a token the same issuer minted for
+      any other API would be accepted — including its own userinfo tokens), or a symmetric
+      development key in Production, each refuse to start.
+    - **Tokens are held in memory only**, so nothing readable is left on the device and a token
+      cannot outlive its tab. A hard refresh re-runs the redirect, silently while the session at
+      the provider is alive. Only the PKCE verifier goes to `sessionStorage`, because it is the one
+      value that has to survive the round trip. A **BFF** stays the stricter option (item 35).
+    - **Reading is still public; only submitting needs an account.** A visitor from a search result
+      can open a question and try it in the editor, and gets "Sign in to submit" rather than a 401
+      after the fact. That matters for the organic traffic the site runs on (D10).
+    - **The end-to-end stack runs with enforcement on**, trusting a development key minted by
+      `tools/mint-dev-token.mjs` — outside the Api, because D4 says the deployed binary contains no
+      token-minting code. One test goes straight to the Api with no token and expects a 401: the
+      rest only prove the browser sends one, so without it an Api that had stopped enforcing
+      anything would still pass the suite.
     *Learn:* OIDC flows, PKCE, JWKS and key rotation, token lifetimes.
 21. **My account** — my submission history; delete my account (local data + the IdP user).
     *Learn:* data-protection basics (GDPR, India's DPDP Act), hard vs soft delete.
@@ -365,6 +394,16 @@ dotnet user-secrets set "RabbitMq:Uri" \
   --project source/DsaPractice.Api
 # DsaPractice.Judge shares the same UserSecretsId, so it reads this one too -- without it the
 # Judge fails startup validation, which is what made F5 on that project unusable.
+
+# one-time: a bearer token, because submitting now needs a signed-in caller. Either point the Api
+# at a real identity provider (docs/auth.md), or mint a development one -- no tenant needed:
+node tools/mint-dev-token.mjs        # prints DEV_JWT_* and VITE_DEV_ACCESS_TOKEN lines
+#   -> the DEV_JWT_* lines go in .env            (docker-compose passes them to the Api)
+#   -> the VITE_ line goes in frontend/.env.local (Vite bakes it into the build)
+# For `dotnet run` rather than the container, `dotnet user-jwts create --project
+# source/DsaPractice.Api --audience dsa-practice-api` writes the same configuration to user
+# secrets and prints a token to paste into Scalar. Without either, the Api refuses to start and
+# says which setting is missing -- see docs/auth.md.
 
 docker compose up -d    # Postgres + RabbitMQ, and a one-shot "migrator" that applies pending
                          # EF Core migrations, seeds content/questions/**, then exits -- no

@@ -71,15 +71,24 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Write .env for docker compose
+      # Submissions need a signed-in caller since item 20, and there is no identity provider in
+      # front of the end-to-end stack: the Api trusts a development signing key generated here,
+      # and the frontend build bakes in a token signed with it. Both come from one command, so
+      # they cannot drift apart. Nothing minted here is trusted by a real deployment -- the Api
+      # refuses to start with a symmetric key in Production.
+      - name: Write .env for docker compose, and a development token
         run: |
+          node tools/mint-dev-token.mjs > "$RUNNER_TEMP/dev-auth.env"
           {
             echo "POSTGRES_DB=dsapractice"
             echo "POSTGRES_USER=dsapractice"
             echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
             echo "RABBITMQ_USER=dsapractice"
             echo "RABBITMQ_PASSWORD=$(openssl rand -hex 16)"
+            grep '^DEV_JWT_' "$RUNNER_TEMP/dev-auth.env"
           } > .env
+          # Vite reads .env.local on its own, so the build needs nothing passed to it.
+          grep '^VITE_DEV_ACCESS_TOKEN=' "$RUNNER_TEMP/dev-auth.env" > frontend/.env.local
 
       - name: Start the stack
         run: docker compose --profile full-stack up -d --build

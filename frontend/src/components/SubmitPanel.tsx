@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import Editor from '@monaco-editor/react';
+import { useLocation } from 'react-router';
 import { useCreateSubmission, useSubmission } from '../api/queries';
+import { useSession } from '../auth/session';
 import VerdictPanel from './VerdictPanel';
+import { ApiError } from '../api/client';
 
 /**
  * Matches Submissions:SupportedLanguages on the Api; both are v1 scope. `fallback` is only used for
@@ -32,6 +35,13 @@ export default function SubmitPanel({
   const createSubmission = useCreateSubmission();
   const submissionId = createSubmission.data?.id;
   const { data: submission } = useSubmission(submissionId);
+
+  const session = useSession();
+  const location = useLocation();
+  // Reading and writing a solution needs no account -- only submitting does, because a submission
+  // belongs to someone and spends judge time. Someone can still open a question, read it and try
+  // it in the editor without ever being asked who they are.
+  const mustSignIn = session.mode === 'oidc' && !session.isAuthenticated;
 
   // Disabled while a submission is in flight or still being judged: a second submission would
   // replace the first one's result panel before anyone has read it.
@@ -74,15 +84,17 @@ export default function SubmitPanel({
 
         <button
           type="button"
-          disabled={busy || sourceCode.trim().length === 0}
+          disabled={(busy || sourceCode.trim().length === 0) && !mustSignIn}
           onClick={() =>
-            // No user id: who is submitting is the Api's decision, from the caller's identity
-            // (item 19). Item 20 adds signing in and a token on this request.
-            createSubmission.mutate({ questionId, language: language.id, sourceCode })
+            mustSignIn
+              ? session.signIn(location.pathname + location.search)
+              : // No user id: who is submitting is the Api's decision, from the token on this
+                // request (items 19 and 20), and sending one would change nothing.
+                createSubmission.mutate({ questionId, language: language.id, sourceCode })
           }
           className="rounded-md bg-slate-900 px-4 py-2 font-medium text-white disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"
         >
-          {busy ? 'Judging…' : 'Submit'}
+          {mustSignIn ? 'Sign in to submit' : busy ? 'Judging…' : 'Submit'}
         </button>
       </div>
 
@@ -105,7 +117,12 @@ export default function SubmitPanel({
 
       {createSubmission.isError && (
         <p role="alert" className="mt-3 rounded-md bg-rose-50 p-3 text-rose-800">
-          Could not submit. {createSubmission.error.message}
+          {/* A session can expire between opening a question and submitting it; "could not submit"
+              plus a 401 detail would leave someone re-reading their code for a fault that is not
+              in it. */}
+          {createSubmission.error instanceof ApiError && createSubmission.error.status === 401
+            ? 'Your session has expired. Sign in again and resubmit — your code is still here.'
+            : `Could not submit. ${createSubmission.error.message}`}
         </p>
       )}
 

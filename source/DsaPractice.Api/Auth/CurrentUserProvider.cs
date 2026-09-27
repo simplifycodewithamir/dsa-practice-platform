@@ -63,9 +63,12 @@ internal sealed class CurrentUserProvider(
         var subject = principal.FindFirstValue("sub") ?? principal.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new InvalidOperationException("An authenticated token carried no subject claim.");
 
-        var issuer = principal.FindFirst("iss")?.Value
+        // A validated token always carries the issuer it was validated against. Falling back to a
+        // placeholder would write a user row keyed on "unknown", which is the one value that can
+        // never be matched back to a person if the provider changes (decision D3).
+        var issuer = principal.FindFirstValue("iss")
             ?? principal.Claims.FirstOrDefault()?.Issuer
-            ?? "unknown";
+            ?? throw new InvalidOperationException("An authenticated token carried no issuer.");
 
         var displayName = principal.FindFirstValue("name") ?? principal.FindFirstValue(ClaimTypes.Name);
 

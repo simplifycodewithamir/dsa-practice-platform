@@ -20,6 +20,17 @@ With Node installed locally, the plain commands work as usual:
 | `npm run build` | type-check and production build |
 | `npm run lint` | ESLint |
 | `npm run generate:api` | regenerate `src/api/schema.d.ts` from the **running** Api's OpenAPI document |
+| `npm run test:e2e` | Playwright, against a running full stack |
+
+Playwright also needs browser **system** libraries, which `npx playwright install` does not install
+and which need root. Without them, run the suite in Playwright's own image instead — same result,
+nothing installed on the machine:
+
+```bash
+docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -e npm_config_cache=/tmp/.npm -e CI=1 \
+  -v "$PWD:/repo" -w /repo/frontend --network host mcr.microsoft.com/playwright:v1.49.0-noble \
+  sh -lc "npx playwright test"
+```
 
 ## The API client is generated, not hand-written
 
@@ -38,6 +49,24 @@ with no starter for the chosen language falls back to the generic comment define
 
 Switching language replaces the code only while it is still exactly some language's starter, so it
 never eats work someone has typed.
+
+## Signing in
+
+`src/auth/` owns all of it — Authorization Code + PKCE via `oidc-client-ts`, held by
+`react-oidc-context`. Nothing outside that folder knows which identity provider is in use, or
+whether there is one: components read a small `Session` from `useSession()`, and the fetch layer is
+handed a token through `setAccessTokenProvider`, because it is not a component and cannot use a
+hook.
+
+Configure it with `VITE_OIDC_*` (copy `.env.example` to `.env.local`). **With no authority
+configured the app runs signed-out**: questions are readable and submitting is not offered, which
+is what a checkout with no tenant of its own does. `VITE_DEV_ACCESS_TOKEN` then supplies a token
+for the end-to-end stack, where the Api trusts a development signing key — `node
+tools/mint-dev-token.mjs` produces both halves. A build with a real authority ignores it outright.
+
+Access tokens are held **in memory only**, so a hard refresh re-runs the redirect (silently, when
+the session at the provider is still alive). Only the PKCE verifier goes to `sessionStorage`,
+because it has to survive the round trip. See `../docs/auth.md`.
 
 ## Why there is no CORS problem in development
 

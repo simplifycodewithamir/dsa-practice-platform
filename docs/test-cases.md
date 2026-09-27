@@ -558,7 +558,7 @@ volume with it.
 
 ## TC-AU · Identity and ownership
 
-API-level; the SPA has no login until item 20.
+Identity comes from the token, and since item 20 a submission requires one.
 
 ### TC-AU-01 · A user is provisioned on first sight
 **Priority** High · **Automated** — `UserProvisioningTests.Submitting_WithAToken_ProvisionsTheUserOnFirstSight`
@@ -585,8 +585,45 @@ API-level; the SPA has no login until item 20.
 
 Role comes from the `Users` table, never a token claim.
 
-### TC-AU-06 · An unreadable token does not inherit an identity
-**Priority** High · **Automated** — `UserProvisioningTests.AnUnreadableToken_DoesNotGetSomeoneElsesIdentity`
+### TC-AU-06 · An unreadable token is rejected, not treated as anonymous
+**Priority** High · **Automated** — `UserProvisioningTests.AnUnreadableToken_Returns401`
+
+**Expected:** `401`. Junk is not an identity, and since item 20 it is not anonymous access either.
+
+### TC-AU-07 · Submitting without a token is refused, in ProblemDetails
+**Priority** **Critical** · **Automated** — `UserProvisioningTests.Submitting_WithoutAToken_Returns401`,
+and end-to-end against the running stack in `solve-a-question.spec.ts`
+
+**Expected:** `401` with `"title": "api.error.unauthorized"` — the same body shape as every other
+failure, not an empty response.
+
+### TC-AU-08 · Reading a question needs no token
+**Priority** **Critical** · **Automated** — `UserProvisioningTests.ReadingAQuestion_NeedsNoToken`
+
+The public, indexable half of the product (D10). Requiring a login to read a statement would cost
+the organic traffic the site runs on.
+
+### TC-AU-09 · With enforcement off, a submission still has a real owner
+**Priority** Medium · **Automated** — `UserProvisioningTests.WithEnforcementOff_SubmittingWithoutAToken_IsAttributedToTheLocalUser`
+
+The escape hatch behind `Auth:RequireAuthentication`: the submission belongs to a
+`local-development/anonymous` row, so the foreign key still holds.
+
+### TC-AU-10 · A broken bearer configuration fails startup
+**Priority** High · **Automated** — `AuthConfigurationValidatorTests`
+
+Enforcement on with no issuer, with no audience, or with a symmetric development key in
+Production, each refuse to start rather than silently change who gets in.
+
+### TC-AU-11 · Signing in from the browser
+**Priority** High · **Manual** — needs a real identity provider tenant (`docs/auth.md`)
+
+1. Open a question signed out. 2. The button reads **Sign in to submit**. 3. Click it, sign in with
+Google. 4. The browser returns to the same question.
+
+**Expected:** the header shows the display name, the button reads **Submit**, and submitting
+succeeds. Component-level coverage of the same behaviour, without a provider, is in
+`SignInControl.test.tsx` and `SubmitPanel.test.tsx`.
 
 ---
 

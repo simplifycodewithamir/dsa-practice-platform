@@ -1,4 +1,5 @@
 import { Link, Outlet } from 'react-router';
+import SignInControl from './SignInControl';
 
 export default function Layout() {
   return (
@@ -11,7 +12,10 @@ export default function Layout() {
           >
             DSA Practice
           </Link>
-          <span className="text-sm text-slate-500">Free practice for students</span>
+          <div className="flex items-center gap-4">
+            <span className="hidden text-sm text-slate-500 sm:inline">Free practice for students</span>
+            <SignInControl />
+          </div>
         </nav>
       </header>
 

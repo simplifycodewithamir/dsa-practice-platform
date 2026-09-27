@@ -16,7 +16,7 @@ public class SubmissionsEndpointsTests(ApiWebApplicationFactory factory)
     public async Task CreateSubmission_ValidRequest_PersistsAndReturns201WithLocation()
     {
         var question = await TestData.SeedAsync(factory, TestData.NewQuestion());
-        using var client = factory.CreateClient();
+        using var client = factory.CreateAuthenticatedClient();
         var request = new CreateSubmissionRequest(question.Id, "csharp", "Console.WriteLine(1);");
 
         using var response = await client.PostAsJsonAsync("/api/v1/submissions", request, TestContext.Current.CancellationToken);
@@ -37,7 +37,7 @@ public class SubmissionsEndpointsTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task CreateSubmission_UnknownQuestionId_Returns404()
     {
-        using var client = factory.CreateClient();
+        using var client = factory.CreateAuthenticatedClient();
         var request = new CreateSubmissionRequest(Guid.NewGuid(), "csharp", "Console.WriteLine(1);");
 
         using var response = await client.PostAsJsonAsync("/api/v1/submissions", request, TestContext.Current.CancellationToken);
@@ -51,7 +51,7 @@ public class SubmissionsEndpointsTests(ApiWebApplicationFactory factory)
     public async Task CreateSubmission_UnsupportedLanguage_Returns400()
     {
         var question = await TestData.SeedAsync(factory, TestData.NewQuestion());
-        using var client = factory.CreateClient();
+        using var client = factory.CreateAuthenticatedClient();
         var request = new CreateSubmissionRequest(question.Id, "rust", "fn main() {}");
 
         using var response = await client.PostAsJsonAsync("/api/v1/submissions", request, TestContext.Current.CancellationToken);
@@ -64,7 +64,7 @@ public class SubmissionsEndpointsTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task GetSubmissionById_UnknownId_Returns404()
     {
-        using var client = factory.CreateClient();
+        using var client = factory.CreateAuthenticatedClient();
 
         using var response = await client.GetAsync($"/api/v1/submissions/{Guid.NewGuid()}", TestContext.Current.CancellationToken);
 

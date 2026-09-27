@@ -293,7 +293,7 @@ sequenceDiagram
     CUP->>CUP: read iss, sub, name
 
     alt not authenticated
-        Note over CUP: only while Auth:RequireAuthentication is false
+        Note over CUP: unreachable while Auth:RequireAuthentication is on<br/>(the default): the middleware already returned 401
         CUP->>CUP: (LocalIssuer, "anonymous")
     end
 

@@ -34,6 +34,11 @@ dotnet user-secrets set "ConnectionStrings:DsaPractice" \
   "Host=localhost;Port=5432;Database=dsapractice;Username=dsapractice;Password=<your .env password>" \
   --project source/DsaPractice.Api
 
+# one-time — a bearer token: submitting requires a signed-in caller (item 20). Either point the
+# Api at a real identity provider or mint a development one; `docs/auth.md` covers both, and the
+# Api refuses to start with a message naming the missing setting.
+node tools/mint-dev-token.mjs   # DEV_JWT_* lines -> .env, VITE_ line -> frontend/.env.local
+
 docker compose up postgres rabbitmq -d
 dotnet run --project source/DsaPractice.Api
 dotnet run --project source/DsaPractice.Judge
@@ -55,4 +60,6 @@ dotnet test --solution source/DsaPractice.slnx   # MTP mode (global.json) needs 
 This project follows the general-purpose skills in `~/.claude/skills/` — `dotnet-production-code`, `dotnet-testing`, `react-frontend`, `git-workflow` — for everything not specific to this repo. The one deviation: day-1 CI here is a single lightweight GitHub Actions workflow (restore → build → test → CodeQL → Docker image), not the full Artifactory/Argo CD/k8s-deploy pattern from `cicd-pipeline` — this is a solo project, revisit that pattern only if it needs real prod-grade rollout later.
 
 ## Current status
-Questions/Submissions endpoints, ProblemDetails error handling, migrations and day-1 CI are done. README.md holds the phased roadmap (one item per PR, in order) and the key decisions D1–D11 behind it — check both before starting any feature.
+The judging loop, the React frontend, and identity (a real OIDC provider, Authorization Code +
+PKCE, submissions requiring a signed-in caller) are done — see `docs/auth.md` for the auth setup.
+README.md holds the phased roadmap (one item per PR, in order) and the key decisions D1–D11 behind it — check both before starting any feature.

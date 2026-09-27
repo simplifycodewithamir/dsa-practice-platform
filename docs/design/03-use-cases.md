@@ -4,7 +4,7 @@
 
 | Actor | Who | How the system knows them |
 |---|---|---|
-| **Visitor** | Anyone, not signed in | No token. Today they can still submit — enforcement is off until item 20 |
+| **Visitor** | Anyone, not signed in | No token. Reads questions freely; submitting is offered as "Sign in to submit" |
 | **Student** | A signed-in learner | Bearer token; a `Users` row provisioned on first sight from `(iss, sub)` |
 | **Admin** | Maintainer | Same, with `Role = Admin` in the `Users` table — never from a token claim |
 | **Content author** | Whoever adds questions | Not a runtime actor at all: they commit files and run the migrator |

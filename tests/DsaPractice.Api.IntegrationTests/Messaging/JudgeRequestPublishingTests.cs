@@ -29,7 +29,7 @@ public class JudgeRequestPublishingTests(ApiWebApplicationFactory factory)
     {
         await MessagingState.ResetAsync(factory);
         var question = await SeedQuestionWithTestCasesAsync();
-        using var client = factory.CreateClient();
+        using var client = factory.CreateAuthenticatedClient();
         var request = new CreateSubmissionRequest(question.Id, "python", "print(1)");
 
         using var response = await client.PostAsJsonAsync("/api/v1/submissions", request, TestContext.Current.CancellationToken);
@@ -55,7 +55,7 @@ public class JudgeRequestPublishingTests(ApiWebApplicationFactory factory)
     {
         await MessagingState.ResetAsync(factory);
         var question = await SeedQuestionWithTestCasesAsync();
-        using var client = factory.CreateClient();
+        using var client = factory.CreateAuthenticatedClient();
         var request = new CreateSubmissionRequest(question.Id, "python", "print(1)");
 
         using var response = await client.PostAsJsonAsync("/api/v1/submissions", request, TestContext.Current.CancellationToken);
@@ -75,7 +75,7 @@ public class JudgeRequestPublishingTests(ApiWebApplicationFactory factory)
     {
         // Other tests leave pending outbox rows, and a relay pass would publish those too.
         await MessagingState.ResetAsync(factory);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateAuthenticatedClient();
         var request = new CreateSubmissionRequest(Guid.NewGuid(), "python", "print(1)");
 
         using var response = await client.PostAsJsonAsync("/api/v1/submissions", request, TestContext.Current.CancellationToken);
