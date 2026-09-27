@@ -76,3 +76,26 @@ export function stubFetchJson(...responses: Array<{ status?: number; body: unkno
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
 }
+
+/**
+ * Stubs fetch by matching the request path, for a page that issues several requests at once.
+ *
+ * `stubFetchJson` answers in call order, which only works when a page fetches one thing at a time --
+ * two parallel queries would each get whichever response happened to be next.
+ */
+export function stubFetchRoutes(routes: Array<[match: string, response: { status?: number; body: unknown }]>) {
+  const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+    const method = init?.method ?? 'GET';
+    const route = routes.find(([match]) => `${method} ${url}`.includes(match));
+
+    if (route === undefined) {
+      throw new Error(`No stubbed response for ${method} ${url}`);
+    }
+
+    const status = route[1].status ?? 200;
+    return Promise.resolve({ ok: status < 400, status, json: async () => route[1].body });
+  });
+
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}

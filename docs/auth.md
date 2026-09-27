@@ -128,6 +128,27 @@ because a SPA is a public client.
 own development keys work for trying it out and are rate-limited and shared; create real OAuth apps
 at Google and GitHub before launch (item 30).
 
+### 5 · A machine-to-machine application (account deletion only)
+
+Needed by item 21, and by nothing else. Deleting an account has to remove the person's sign-in at
+Auth0 as well as their data here, and that is the Management API — which is a *different* audience
+from the Api, with its own credentials.
+
+*Applications → Applications → Create → Machine to Machine*, authorized against **Auth0 Management
+API**, and grant it exactly one scope:
+
+| Scope | Why |
+|---|---|
+| `delete:users` | the whole job. Anything more is a credential that can do more than erase. |
+
+Do not grant `read:users`, `update:users` or `read:user_idp_tokens`. The Api never reads a profile
+from the provider — everything it shows comes from the token or from its own `Users` row (D3) — so a
+read scope would only widen what a leaked secret is worth.
+
+This application has a **client secret**, and it is the first real secret in the project. It never
+goes in `appsettings.json` and never in `.env`: `dotnet user-secrets` locally, the environment on
+the VM (item 25).
+
 ---
 
 ## Configuring the Api
@@ -166,6 +187,56 @@ VITE_OIDC_AUDIENCE=https://api.<your-domain>
 All three are baked into the bundle and readable by anyone. That is fine: a public client has no
 secret. **With the authority unset the app runs signed-out** — questions readable, submitting not
 offered — which is what a checkout with no tenant of its own does.
+
+## Configuring account deletion
+
+Three settings, all or nothing:
+
+```bash
+dotnet user-secrets set "IdentityProvider:Management:Domain" "dev-s4cf7y7mvj0ejgti.us.auth0.com" \
+  --project source/DsaPractice.Api
+dotnet user-secrets set "IdentityProvider:Management:ClientId" "<the M2M application's client id>" \
+  --project source/DsaPractice.Api
+dotnet user-secrets set "IdentityProvider:Management:ClientSecret" "<its client secret>" \
+  --project source/DsaPractice.Api
+```
+
+`Domain` is the host only — no scheme, no trailing slash. The issuer, the management audience and
+the token endpoint are all derived from it, and a value carrying either would produce a malformed
+URL for one of them.
+
+**Leaving all three unset is a supported configuration.** Erasure then deletes the local data and
+reports that the provider's copy was not touched — which is what the containerised stack, CI and a
+checkout with no tenant of its own do. **Setting only some of them is not**: the Api refuses to
+start, because a typo in one setting would otherwise downgrade itself into an erasure that silently
+skips the provider.
+
+### What `DELETE /api/v1/me` actually does
+
+Erasure is a **hard delete**, in this order, and the order is the design:
+
+1. In one database transaction: the outbox rows carrying their queued code, their per-test results,
+   their submissions, then their `Users` row. Last, because the submissions' foreign key restricts
+   against it.
+2. Then, and only then, the user at Auth0.
+
+**Local data first.** The other order can leave source code in the database that nobody can reach a
+delete button for any more — unreachable personal data is worse than a sign-in that still works.
+
+**A soft-delete flag was not an option.** Erasure under GDPR Art. 17 and India's DPDP Act §12 means
+the data is gone, not hidden behind `IsDeleted`; and nothing in the product needs the rows, because
+there is no leaderboard or progress tracking until v2.
+
+**The two halves cannot share a transaction**, so the endpoint answers **200 with a body** saying
+what each of them did, rather than 204. A silent 204 that had left the Auth0 user alive would be the
+API claiming an erasure it did not perform. When the provider call fails, the response says so, the
+Api logs it, and the account has to be removed from the dashboard by hand. A durable retry belongs
+on the outbox, which is item 23's machinery — not worth pulling forward for a call that fails only
+when Auth0 is down or the secret is wrong.
+
+**Coming back is a new account.** The `(iss, sub)` row is gone, so signing in again provisions a
+fresh one with a new internal id and no history — including when the provider deletion failed and
+the same sign-in still works.
 
 ### Where the tokens live
 
@@ -229,5 +300,6 @@ environment variable cannot make a production bundle trust a development token.
 
 - **Registration, password reset, MFA, bot signup.** The provider's, not ours (D3).
 - **A token endpoint in the Api.** D4. Everything above mints tokens outside the deployed binary.
-- **`/api/v1/me` and account deletion.** Item 21.
 - **Rate limiting per user.** Item 22 — an account is what makes per-user limits possible at all.
+- **Any Management API scope beyond `delete:users`.** The Api reads no profile from the provider;
+  a read scope would only widen what the one real secret in the project is worth.
