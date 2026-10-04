@@ -230,8 +230,46 @@ were in boilerplate rather than in anyone's algorithm.
       rest only prove the browser sends one, so without it an Api that had stopped enforcing
       anything would still pass the suite.
     *Learn:* OIDC flows, PKCE, JWKS and key rotation, token lifetimes.
-21. **My account** — my submission history; delete my account (local data + the IdP user).
-    *Learn:* data-protection basics (GDPR, India's DPDP Act), hard vs soft delete.
+21. **My account** — `/account` shows who you are and every submission you have made, and erases
+    you on request: the local data *and* the user at the identity provider. Setup and configuration
+    are in `docs/auth.md`.
+    - **`/api/v1/me`, never `/users/{id}`.** Every route means the caller, so one person's data has
+      no address another person could guess. The whole group requires a signed-in caller
+      **unconditionally**, unlike submissions, which fall back to a shared local user when
+      `Auth:RequireAuthentication` is off: "me" with nobody signed in has no defensible answer, and
+      an unauthenticated `DELETE` would erase that shared row in the configuration where it is least
+      expected.
+    - **Hard delete, not a flag.** Erasure under GDPR Art. 17 and India's DPDP Act §12 means the data
+      is gone, not hidden behind `IsDeleted` — and nothing here needs the rows, because there is no
+      leaderboard or progress tracking until v2. What goes, in one transaction: the outbox rows
+      carrying their queued code, the per-test results, the submissions, then the `Users` row (last —
+      the submissions' foreign key restricts against it).
+    - **The outbox rows are the part that is easy to miss.** A queued judge request holds the source
+      code verbatim in its payload. Leaving it would mean the code outlives the account and then gets
+      *run* after it.
+    - **Local data first, then the provider.** The other order can leave source code in the database
+      that nobody can reach a delete button for any more; unreachable personal data is worse than a
+      sign-in that still works.
+    - **Two systems, no transaction — so the response says what each did.** `DELETE` answers 200 with
+      a body, not 204: a silent 204 that had left the Auth0 user alive would be the API claiming an
+      erasure it had not performed. The page says so too, rather than hiding it behind a success
+      message. A durable retry belongs on the outbox (item 23), not pulled forward here.
+    - **One class knows the provider by name.** `IIdentityProviderAccounts` has a single
+      `DeleteUserAsync`, an Auth0 Management API implementation, and an unconfigured one that reports
+      `NotAttempted` rather than pretending to succeed. Credentials unset is a supported
+      configuration (CI, the local stack, a checkout with no tenant); *half* set is a failed startup.
+      A deletion is also skipped when the user's stored `iss` is not the configured tenant's — that
+      subject means nothing there, and could name someone else.
+    - **The management application gets `delete:users` and nothing else** — no `read:users`. The Api
+      reads no profile from the provider (D3), so a read scope would only widen what the project's
+      one real secret is worth.
+    - **Coming back is a new account**: the `(iss, sub)` row is gone, so signing in again provisions
+      a fresh one with no history — including when the provider deletion failed.
+    - The account queries are **removed** from the client cache on success, not invalidated:
+      invalidating would refetch `GET /api/v1/me`, which provisions on first sight, so confirming the
+      deletion would immediately recreate the account.
+    *Learn:* data-protection basics (GDPR, India's DPDP Act), hard vs soft delete, why a
+    cross-system delete has an order and a partial-failure story.
 
 ### Phase 4 — Abuse protection & production readiness
 A free code-execution service is an obvious target for crypto-mining and abuse — all of this lands before launch.

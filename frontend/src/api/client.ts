@@ -12,6 +12,10 @@ export type CreateSubmission = components['schemas']['CreateSubmissionRequest'];
 export type Difficulty = components['schemas']['QuestionDifficulty'];
 export type Verdict = components['schemas']['SubmissionVerdict'];
 export type ProblemDetails = components['schemas']['ProblemDetails'];
+export type Account = components['schemas']['AccountResponse'];
+export type AccountSubmission = components['schemas']['AccountSubmissionResponse'];
+export type AccountSubmissions = components['schemas']['AccountSubmissionsResponse'];
+export type DeleteAccountResult = components['schemas']['DeleteAccountResponse'];
 
 /** Same origin in dev (Vite proxies /api); an absolute URL in production. */
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
@@ -85,4 +89,16 @@ export const api = {
     }),
 
   getSubmission: (id: string) => request<Submission>(`/api/v1/submissions/${encodeURIComponent(id)}`),
+
+  getAccount: () => request<Account>('/api/v1/me'),
+
+  listMySubmissions: (page: number, pageSize: number) =>
+    request<AccountSubmissions>(`/api/v1/me/submissions?page=${page}&pageSize=${pageSize}`),
+
+  /**
+   * Erasure. Answers 200 with what actually happened rather than 204, because the local data and the
+   * account at the identity provider are two systems and the second one can fail on its own -- the
+   * UI has to be able to say so.
+   */
+  deleteAccount: () => request<DeleteAccountResult>('/api/v1/me', { method: 'DELETE' }),
 };

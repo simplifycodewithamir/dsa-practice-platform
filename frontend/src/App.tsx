@@ -4,6 +4,7 @@ import QuestionsPage from './pages/QuestionsPage';
 import QuestionPage from './pages/QuestionPage';
 import NotFoundPage from './pages/NotFoundPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
+import AccountPage from './pages/AccountPage';
 import { isOidcConfigured } from './auth/config';
 
 export default function App() {
@@ -16,6 +17,9 @@ export default function App() {
         {/* Only a route when there is a provider to come back from; otherwise it is a 404 like any
             other unknown path, rather than a page that waits forever for a code that never arrives. */}
         {isOidcConfigured && <Route path="/auth/callback" element={<AuthCallbackPage />} />}
+        {/* Same reasoning: with no provider there is no account to show, so this is a 404 rather
+            than a page explaining that the feature does not exist here. */}
+        {isOidcConfigured && <Route path="/account" element={<AccountPage />} />}
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

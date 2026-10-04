@@ -627,6 +627,99 @@ succeeds. Component-level coverage of the same behaviour, without a provider, is
 
 ---
 
+## TC-AC · My account and erasure
+
+### TC-AC-01 · Every `/api/v1/me` route needs a token
+**Priority** **Critical** · **Automated** — `AccountEndpointsTests.EveryRoute_WithoutAToken_Returns401`
+
+`GET /me`, `GET /me/submissions` and `DELETE /me` each 401 without one. There is no `/users/{id}`,
+so one person's data has no address another could guess.
+
+### TC-AC-02 · With enforcement off, `/me` still needs a token
+**Priority** High · **Automated** — `AccountEndpointsTests.EveryRoute_WithEnforcementOff_StillRequiresAToken`
+
+Unlike submissions (TC-AU-09), these routes do not fall back to the shared local user. An
+unauthenticated `DELETE` would erase that row in the configuration where it is least expected.
+
+### TC-AC-03 · The account is provisioned on first sight
+**Priority** Medium · **Automated** — `AccountEndpointsTests.GetAccount_ReturnsTheCallersOwnAccount`
+
+Someone who has signed in but never submitted sees their account, not a 404 they can do nothing
+about.
+
+### TC-AC-04 · History is mine only, newest first
+**Priority** **Critical** · **Automated** — `AccountEndpointsTests.GetSubmissions_ReturnsOnlyMine_NewestFirst`
+
+Somebody else's submission never appears, and the order is stable — ordered by id as well as time,
+so two submissions sharing a timestamp cannot land on two pages or on neither.
+
+### TC-AC-05 · History pages
+**Priority** Medium · **Automated** — `AccountEndpointsTests.GetSubmissions_PagesThroughTheHistory`
+
+`totalCount` is what tells the UI there is a next page; a full page cannot imply it.
+
+### TC-AC-06 · Paging out of range is rejected, not clamped
+**Priority** Medium · **Automated** — `AccountEndpointsTests.GetSubmissions_WithPagingOutOfRange_Returns400`
+
+`page=0`, `pageSize=0` and `pageSize=101` each 400 in ProblemDetails. Serving page 1 to a client
+that asked for page 0 would hide the client's bug.
+
+### TC-AC-07 · Erasure removes the submissions, the results and the queued code
+**Priority** **Critical** · **Automated** — `AccountEndpointsTests.DeleteAccount_ErasesTheSubmissionsTheResultsAndTheQueuedCode`
+
+Asserted against the database, not the response: an endpoint that returns the right JSON while
+leaving rows behind is the failure that matters. The outbox row is the easy one to miss — its
+payload holds the source code verbatim, so leaving it would let the code outlive the account and
+then be *run* after it.
+
+### TC-AC-08 · Erasure leaves everyone else alone
+**Priority** **Critical** · **Automated** — `AccountEndpointsTests.DeleteAccount_LeavesEveryoneElseAlone`
+
+Another person's user row and submissions survive, and so does the shared question.
+
+### TC-AC-09 · Coming back is a new account
+**Priority** Medium · **Automated** — `AccountEndpointsTests.DeleteAccount_ThenComingBack_IsANewAccountWithNoHistory`
+
+The same sign-in provisions a fresh row with a new internal id and no history.
+
+### TC-AC-10 · With no management credentials, erasure says so
+**Priority** High · **Automated** — `AccountEndpointsTests.DeleteAccount_WithNoManagementCredentials_SaysTheProviderWasNotAttempted`
+
+Reports `NotAttempted`. Claiming `Deleted` would make the API lie about an erasure — the one thing a
+right-to-erasure endpoint must not do.
+
+### TC-AC-11 · A user from another issuer is never deleted at the provider
+**Priority** High · **Automated** — `Auth0IdentityProviderAccountsTests.DeleteUserAsync_ForAUserFromAnotherIssuer_DoesNotCallTheProvider`
+
+The stored subject means nothing at a tenant that did not mint it, and could name someone else there.
+Nothing is sent at all.
+
+### TC-AC-12 · A provider refusal or outage is reported, not swallowed
+**Priority** High · **Automated** — `Auth0IdentityProviderAccountsTests` (403/429/500, a failed token request, an unreachable host)
+
+Each reports `Failed` without throwing: the local data is already committed as deleted, so there is
+no operation left to abandon — only a truthful outcome to return. A 404 counts as `Deleted`, so a
+retried erasure never reports worse than the first.
+
+### TC-AC-13 · Typing the word is required before deleting
+**Priority** High · **Automated** — `AccountPage.test.tsx` (`will not delete the account until the word is typed`)
+
+The button stays disabled until `delete` is typed. This cannot be undone, so a misplaced click must
+not be enough. The page also states plainly when the provider half failed, rather than hiding it
+behind a success message.
+
+### TC-AC-14 · Deleting for real, at Auth0
+**Priority** High · **Manual** — needs a real tenant and the M2M application (`docs/auth.md`)
+
+1. Sign in, submit once. 2. Open `/account` and confirm the submission is listed. 3. Type `delete`
+and confirm.
+
+**Expected:** the page reports the submission count and that the provider sign-in was removed; the
+user is gone from *User Management → Users* in the Auth0 dashboard; signing in again creates a fresh
+account with an empty history.
+
+---
+
 ## TC-CT · Content authoring
 
 ### TC-CT-01 · Re-running the migrator changes nothing
@@ -712,12 +805,13 @@ Before a release, or after touching the judging path. Twenty minutes by hand.
 | 7 | TC-ED-01 + TC-ED-07 | Starters arrive and compile |
 | 8 | TC-CT-01 | The migrator is still idempotent |
 | 9 | TC-RS-02 | Dead-letter queue empty |
+| 10 | TC-AC-07 + TC-AC-08 | Erasure removes everything of mine and nothing of anyone else's |
 
 Or, faster and stricter:
 
 ```bash
-dotnet test --solution source/DsaPractice.slnx     # 164
-cd frontend && npm test && npm run test:e2e        # 36 + 6
+dotnet test --solution source/DsaPractice.slnx     # integration tests need Docker running
+cd frontend && npm test && npm run test:e2e        # 62 + 6
 tools/check-starters.sh
 ```
 

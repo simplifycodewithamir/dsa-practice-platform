@@ -60,6 +60,8 @@ dotnet test --solution source/DsaPractice.slnx   # MTP mode (global.json) needs 
 This project follows the general-purpose skills in `~/.claude/skills/` — `dotnet-production-code`, `dotnet-testing`, `react-frontend`, `git-workflow` — for everything not specific to this repo. The one deviation: day-1 CI here is a single lightweight GitHub Actions workflow (restore → build → test → CodeQL → Docker image), not the full Artifactory/Argo CD/k8s-deploy pattern from `cicd-pipeline` — this is a solo project, revisit that pattern only if it needs real prod-grade rollout later.
 
 ## Current status
-The judging loop, the React frontend, and identity (a real OIDC provider, Authorization Code +
-PKCE, submissions requiring a signed-in caller) are done — see `docs/auth.md` for the auth setup.
+The judging loop, the React frontend, identity (a real OIDC provider, Authorization Code + PKCE,
+submissions requiring a signed-in caller) and accounts (item 21: submission history at `/account`,
+hard-delete erasure covering the Auth0 user too) are done — see `docs/auth.md` for the auth setup,
+the management credentials erasure needs, and why the delete has the order it has.
 README.md holds the phased roadmap (one item per PR, in order) and the key decisions D1–D11 behind it — check both before starting any feature.

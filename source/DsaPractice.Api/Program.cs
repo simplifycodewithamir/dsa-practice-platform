@@ -87,6 +87,45 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserProvider, CurrentUserProvider>();
 builder.Services.AddScoped<SubmissionOwnershipFilter>();
 
+// The one thing this Api asks of the provider rather than being told by it: deleting a person's
+// account there when they delete it here (item 21). Optional -- with the section unset, erasure
+// deletes the local data and reports plainly that the provider's copy was not touched -- but not
+// half-set, which would be a configuration mistake quietly downgraded into an incomplete erasure.
+builder.Services.AddOptions<IdentityProviderOptions>()
+    .Bind(builder.Configuration.GetSection(IdentityProviderOptions.SectionName))
+    .Validate(
+        o => !o.IsPartiallyConfigured,
+        $"{IdentityProviderOptions.SectionName} needs Domain, ClientId and ClientSecret together, or none of them.")
+    .ValidateOnStart();
+
+var identityProvider = builder.Configuration.GetSection(IdentityProviderOptions.SectionName)
+    .Get<IdentityProviderOptions>() ?? new IdentityProviderOptions();
+
+if (identityProvider.IsConfigured)
+{
+    // Timings are set explicitly rather than taken from the standard handler's defaults, and they
+    // are deliberately shorter than this project's usual 8s/16s/32s external-call budget: the call
+    // sits inside a user-facing DELETE whose local half has already committed, so a minute of
+    // retries would hold the response open long after the person has learned nothing new. What the
+    // retries cannot fix is reported in the response body and logged instead.
+    builder.Services.AddHttpClient(Auth0IdentityProviderAccounts.HttpClientName)
+        .AddStandardResilienceHandler(options =>
+        {
+            options.Retry.MaxRetryAttempts = 3;
+            options.Retry.Delay = TimeSpan.FromSeconds(2);
+            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(5);
+            options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(30);
+            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(30);
+        });
+
+    // Singleton so the management access token is minted once and reused until it nearly expires.
+    builder.Services.AddSingleton<IIdentityProviderAccounts, Auth0IdentityProviderAccounts>();
+}
+else
+{
+    builder.Services.AddSingleton<IIdentityProviderAccounts, UnconfiguredIdentityProviderAccounts>();
+}
+
 builder.Services.AddOptions<RabbitMqOptions>()
     .Bind(builder.Configuration.GetSection(RabbitMqOptions.SectionName))
     .Validate(o => Uri.TryCreate(o.Uri, UriKind.Absolute, out _), "RabbitMq:Uri must be an absolute amqp:// URI.")
@@ -121,11 +160,12 @@ builder.Services.AddHostedService<JudgedResultConsumer>();
 // the browser sees one origin and never asks.
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [])
-    .WithMethods("GET", "POST")
+    .WithMethods("GET", "POST", "DELETE")
     .WithHeaders("content-type", "authorization")));
 
 builder.Services.AddScoped<IQuestionsService, QuestionsService>();
 builder.Services.AddScoped<ISubmissionsService, SubmissionsService>();
+builder.Services.AddScoped<IAccountService, AccountService>();
 
 // TODO: register FeatureManagement, OpenTelemetry
 
@@ -153,6 +193,8 @@ app.UseAuthorization();
 
 app.MapGroup("/api/v1/questions").MapQuestionsEndpoints();
 var submissions = app.MapGroup("/api/v1/submissions").MapSubmissionsEndpoints();
+// Always authorized, whatever Auth:RequireAuthentication says -- see AccountEndpoints.
+app.MapGroup("/api/v1/me").MapAccountEndpoints();
 
 // On by default since item 20. It stays configurable so the end-to-end stack and a developer who
 // has not set an issuer up yet can turn it off deliberately; AuthConfigurationValidator makes
